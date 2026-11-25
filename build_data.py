@@ -33,6 +33,7 @@ WIND_BUCKETS = [(0, 10, "0-9 mph"), (10, 15, "10-14 mph"), (15, 20, "15-19 mph")
 DIST_BUCKETS = [(0, 45, "<45"), (45, 70, "45-70"), (70, 999, "70+")]
 ODDS_SPORT = "americanfootball_nfl"
 ODDS_MARKET = "player_reception_yds"
+CREDIT_RESERVE = 25       # stop pulling props when fewer credits than this remain
 
 TEAM_NAMES = {  # The Odds API full names -> nflverse abbreviations
     "Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
@@ -170,9 +171,15 @@ def fetch_odds(key, week_games):
         pair = (TEAM_NAMES.get(e["away_team"]), TEAM_NAMES.get(e["home_team"]))
         if pair not in wanted:
             continue
+        if remaining is not None and float(remaining) < CREDIT_RESERVE:
+            log(f"odds: stopping, only {remaining} credits left (reserve {CREDIT_RESERVE})")
+            break
         resp = requests.get(f"{base}/events/{e['id']}/odds", timeout=30, params={
             "apiKey": key, "regions": "us", "markets": ODDS_MARKET, "oddsFormat": "american"})
         remaining = resp.headers.get("x-requests-remaining", remaining)
+        if resp.status_code in (401, 429):   # out of credits or bad key: stop, don't waste calls
+            log("odds stopped:", resp.status_code, resp.text[:200])
+            break
         if resp.status_code != 200:
             log("odds error", resp.status_code, resp.text[:200])
             continue
@@ -312,17 +319,20 @@ def main():
             prev = {}
     key = os.environ.get("ODDS_API_KEY", "").strip()
     fetch = os.environ.get("FETCH_ODDS", "1") == "1"
-    odds, odds_meta = {}, {}
+    same_week = prev.get("meta", {}).get("week") == week and prev.get("meta", {}).get("season") == season
+    odds = dict(prev.get("odds", {})) if same_week else {}       # start from this week's earlier pull
+    odds_meta = dict(prev.get("meta", {}).get("odds", {})) if same_week else {}
     if key and fetch:
         try:
-            odds, remaining = fetch_odds(key, games)
-            odds_meta = {"updated": now_utc(), "creditsRemaining": remaining}
+            new, remaining = fetch_odds(key, games)
+            odds.update(new)                                      # fresh lines overwrite, missing players keep earlier lines
+            if new:
+                odds_meta["updated"] = now_utc()
+            if remaining is not None:
+                odds_meta["creditsRemaining"] = remaining
         except Exception as e:
             log("odds fetch failed:", e)
-    if not odds and prev.get("meta", {}).get("week") == week and prev.get("meta", {}).get("season") == season:
-        odds = prev.get("odds", {})          # keep this week's earlier odds pull
-        odds_meta = prev.get("meta", {}).get("odds", {})
-        log(f"odds: reused previous pull ({len(odds)} players)")
+    log(f"odds: {len(odds)} players available")
 
     data = {
         "meta": {"generated": now_utc(), "season": season,

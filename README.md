@@ -12,7 +12,7 @@ A static web app (GitHub Pages) plus a free scheduled data job (GitHub Actions).
 | Spread, total, and projected pass attempts (#11) | nflverse schedules + fitted model | Tue / Thu / Sat / Sun |
 | QB list and Y/A, with starter selection (#7) | nflverse rosters + injuries | Tue / Thu / Sat / Sun |
 | Kickoff wind and precipitation (#8) | Open-Meteo, fetched live in your browser | Each time you load a player |
-| Sportsbook line and over/under odds, by book | The Odds API (free key) | Thu / Sat / Sun |
+| Sportsbook line and over/under odds, by book | The Odds API (free key), or **your own line** (toggle in box 7) | Thu / Sat / Sun |
 | **Coverage rates, YPRR splits, overall YPRR** | **You, from FTN Stats IQ** | Manual. Remembered per opponent and player for the week. |
 
 ## Model
@@ -64,6 +64,19 @@ requirements.txt                   Python packages for the builder
 
 After that, it updates itself on schedule. To pull fresh props before kickoff, run it manually again (step 5).
 
+## Odds API credits
+
+- **Cost:** 1 credit per game per props pull. A full week is about 14–16 games.
+- **Scheduled usage:** 3 props pulls a week (Thu/Sat/Sun) is about 45 credits/week, or about 195 a month. The Tuesday run is stats-only and uses no credits.
+- **Spare credits:** of the 500 free, about 300 are left over, which is room for about 20 manual pulls a month.
+- **Built-in protection:** the job stops pulling props when fewer than 25 credits remain, or right away if the API reports it's out. It keeps every line already pulled that week, so a partial pull never wipes out good data.
+- **If you run out:** switch box 7 to **"My own line"**. Credits reset on the 1st of each month. If you ever want unlimited pulls, the paid plan is $30/month for 20,000 credits.
+
+## Line source toggle (box 7)
+
+- **Auto (sportsbook feed):** pick a sportsbook from the dropdown, and the line and odds fill in.
+- **My own line:** type the line and odds yourself, plus an optional sportsbook name for the log. Loading a new player clears these fields, so another player's line can't carry over. The choice is remembered.
+
 ## Weekly workflow
 
 1. **Thursday onward:** open the site and pick a player in box 0.
@@ -76,10 +89,11 @@ After that, it updates itself on schedule. To pull fresh props before kickoff, r
 
 | Problem | Fix |
 |---|---|
+| No "Update model data" in the Actions tab | The workflow file isn't at the right path. It must be exactly `.github/workflows/update-data.yml` at the **top level** of the repo (not inside another folder, and spelled with the leading dot). Fix: **Add file → Create new file**, type `.github/workflows/update-data.yml` as the name, paste the file contents, and commit. |
 | "No data file found: manual mode" | Run the workflow (setup step 5), then hard-refresh the site. |
 | Workflow fails at "Commit updated data" with a 403 error | Redo setup step 3 (Read and write permissions). |
 | "No props posted" for every player | Props usually appear 1–3 days before kickoff. Run the workflow manually closer to the game. Also check that the `ODDS_API_KEY` secret exists. |
-| Props stopped updating late in the month | You've used the 500 free credits. They reset on the 1st. |
+| Props stopped updating late in the month | You've hit the credit reserve. Switch to "My own line" until credits reset on the 1st. |
 | Scheduled runs stopped (e.g. in the offseason) | GitHub pauses schedules in inactive public repos. Re-enable the workflow in the Actions tab. |
 | A value looks wrong | Every field is editable, and your edit overrides the auto value. |
 

@@ -194,7 +194,12 @@
   <!-- 7. LINE & ODDS -->
   <section class="card">
     <h2><span class="step">7</span>Sportsbook line &amp; odds</h2>
-    <div class="grid">
+    <div class="toggle" id="lineToggle">
+      <button type="button" data-line="auto" class="active">Auto (sportsbook feed)</button>
+      <button type="button" data-line="own">My own line</button>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div id="myBookWrap" class="hidden"><label for="myBook">Sportsbook (optional, for your log)</label><input id="myBook" type="text" placeholder="e.g. DraftKings"></div>
       <div id="bookWrap" class="hidden"><label for="bookSel">Sportsbook</label><select id="bookSel"></select></div>
       <div><label for="line">Yardage line (required)<span class="auto">auto</span></label><input id="line" type="number" step="0.5" min="0" placeholder="e.g. 72.5"></div>
       <div><label for="overOdds">Over odds<span class="auto">auto</span></label><input id="overOdds" type="number" step="1" placeholder="-110"></div>
@@ -288,9 +293,9 @@ const STADIUMS = {
   SF:[37.4030,-121.9700,'o'], TB:[27.9759,-82.5033,'o'], TEN:[36.1665,-86.7713,'o'], WAS:[38.9077,-76.8645,'o']
 };
 const FIELDS = ['player','team','opp','week','yprrAll','ypg','l4ypg','seasonTS','l4TS','projTS','attAvg','teamG','total',
-  'spread','projAtt','oppYPA','lgYPA','incYA','qbYA','wind','line','overOdds','underOdds','weight','seasonW','edgeThresh','precipF'];
+  'spread','projAtt','oppYPA','lgYPA','incYA','qbYA','wind','line','overOdds','underOdds','myBook','weight','seasonW','edgeThresh','precipF'];
 const CHECKS = ['indoor','precip'];
-const K = { inputs:'wrModel.inputs.v2', log:'wrModel.log.v2', oldLog:'wrModel.log.v1', cov:'wrModel.covmem.v1', book:'wrModel.book' };
+const K = { inputs:'wrModel.inputs.v2', log:'wrModel.log.v2', oldLog:'wrModel.log.v1', cov:'wrModel.covmem.v1', book:'wrModel.book', lineMode:'wrModel.lineMode' };
 
 const $ = id => document.getElementById(id);
 const num = id => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
@@ -305,6 +310,7 @@ const store = {
   set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
 };
 
+let lineMode = store.get('wrModel.lineMode') === 'own' ? 'own' : 'auto';
 let DATA = null, FITS = FALLBACK_FITS, mode = 'simple', curId = null, out = new Set(), lastResult = null;
 
 // ---------------- Odds math ----------------
@@ -332,7 +338,7 @@ function buildCoverageRows(rates = [], yprrs = []){
     <tr><td>${c}</td>
       <td class="num"><input class="covRate" type="number" step="0.1" min="0" max="100" placeholder="%" value="${esc(rates[i] ?? '')}"></td>
       <td class="num"><input class="covYprr" type="number" step="0.01" min="0" placeholder="YPRR" value="${esc(yprrs[i] ?? '')}"></td></tr>`).join('');
-  document.querySelectorAll('.toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('.toggle:not(#lineToggle) button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
 }
 const readCov = () => ({
   rates: [...document.querySelectorAll('.covRate')].map(e => e.value),
@@ -372,7 +378,8 @@ function renderStatus(){
   if (!DATA){ $('dataStatus').innerHTML = '<span class="warn">No data file found: manual mode.</span> Enter every field by hand. Distributions use built-in defaults.'; $('pickCard').classList.add('hidden'); return; }
   const m = DATA.meta, o = m.odds || {};
   $('dataStatus').innerHTML = `Data: <b>${m.season} Week ${m.week}</b> · stats updated <b>${esc(m.generated)}</b>` +
-    (o.updated ? ` · props updated <b>${esc(o.updated)}</b>${o.creditsRemaining != null ? ` (${esc(o.creditsRemaining)} API credits left)` : ''}` : ' · <span class="warn">no props pulled yet</span>');
+    (o.updated ? ` · props updated <b>${esc(o.updated)}</b>${o.creditsRemaining != null ? ` (${esc(o.creditsRemaining)} API credits left)` : ''}` : ' · <span class="warn">no props pulled yet</span>') +
+    (o.creditsRemaining != null && +o.creditsRemaining < 50 ? ' · <span class="warn">credits low: switch box 7 to "My own line" until they reset on the 1st</span>' : '');
 }
 function teamsThisWeek(){ const s = new Set(); (DATA.games||[]).forEach(g => { s.add(g.home); s.add(g.away); }); return s; }
 function buildPicker(){
@@ -414,7 +421,7 @@ function loadPlayer(id, fill = true){
   } else $('gameInfo').innerHTML = '<span class="warn">No game found for this team this week.</span>';
   renderMates(); if (fill) recomputeTS();
   fillQBs(fill); if (fill) recomputeAtt();
-  fillBooks(fill);
+  fillBooks(fill ? 'player' : false);
   if (fill) setupWeather(g, p.team); else describeVenue(g);
 }
 
@@ -520,7 +527,21 @@ function weatherFactor(){
 }
 
 // ---------------- Odds ----------------
+function setLineMode(m, fill){
+  lineMode = m; store.set(K.lineMode, m);
+  document.querySelectorAll('#lineToggle button').forEach(b => b.classList.toggle('active', b.dataset.line === m));
+  $('myBookWrap').classList.toggle('hidden', m !== 'own');
+  document.querySelectorAll('#line, #overOdds, #underOdds').forEach(el => {
+    const tag = el.parentElement.querySelector('.auto'); if (tag) tag.classList.toggle('hidden', m === 'own'); });
+  fillBooks(fill);
+}
 function fillBooks(fill){
+  if (lineMode === 'own'){
+    $('bookWrap').classList.add('hidden');
+    $('oddsInfo').textContent = 'Using your own line. Enter the line and odds for each player (odds default to -110 if blank).';
+    if (fill === 'player') ['line','overOdds','underOdds'].forEach(i => set(i, null));   // new player: never carry over a stale line
+    return;
+  }
   const name = $('player').value, list = DATA && DATA.odds ? (DATA.odds[normName(name)] || []) : [];
   if (!list.length){
     $('bookWrap').classList.add('hidden');
@@ -677,7 +698,7 @@ function renderLog(){
   $('logBody').innerHTML = log.length ? log.map((e,i) => {
     const g = grade(e), a = parseFloat(e.actual);
     return `<tr><td>${esc(e.date)}</td><td>${esc(e.player)}</td><td>${esc(e.opp)}</td><td>${esc(e.week)}</td>
-      <td class="num">${f1(e.proj)}</td><td class="num">${e.fair != null ? f1(e.fair) : '—'}</td><td class="num">${e.line != null ? e.line : '—'}</td>
+      <td class="num">${f1(e.proj)}</td><td class="num">${e.fair != null ? f1(e.fair) : '—'}</td><td class="num">${e.line != null ? e.line : '—'}${e.book ? `<br><span class="sub">${esc(e.book)}</span>` : ''}</td>
       <td>${e.side ? esc(e.side) : '—'}</td><td class="num">${e.odds != null ? fmtOdds(e.odds) : '—'}</td><td class="num">${e.ev != null ? sgn(e.ev) + f1(e.ev) : '—'}</td>
       <td class="num"><input type="number" step="1" data-i="${i}" class="actIn" value="${esc(e.actual ?? '')}"></td>
       <td class="num ${g ? (g.res === 'W' ? 'ok' : g.res === 'L' ? 'bad' : '') : ''}">${g ? `${g.res} ${sgn(g.u)}${g.u.toFixed(2)}u` : (Number.isFinite(a) ? 'no bet' : '—')}</td>
@@ -701,7 +722,7 @@ function renderLog(){
 }
 function exportCSV(){
   const log = getLog(); if (!log.length) return;
-  const cols = ['date','player','opp','week','proj','fair','line','side','odds','pSide','ev','actual','overOdds','underOdds','tsF','volF','covRaw','covF','defF','qbF','wxF','weight','seasonW'];
+  const cols = ['date','player','opp','week','proj','fair','line','book','side','odds','pSide','ev','actual','overOdds','underOdds','tsF','volF','covRaw','covF','defF','qbF','wxF','weight','seasonW'];
   const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
   const csv = [cols.join(',')].concat(log.map(e => cols.map(c => q(typeof e[c] === 'number' ? +e[c].toFixed(4) : e[c])).join(','))).join('\n');
   const a = document.createElement('a');
@@ -736,7 +757,10 @@ $('logBody').addEventListener('click', e => {
   const i = e.target.dataset.del; if (i === undefined) return;
   const log = getLog(); log.splice(+i, 1); setLog(log);
 });
-document.querySelectorAll('.toggle button').forEach(b => b.onclick = () => {
+document.querySelectorAll('#lineToggle button').forEach(b => b.onclick = () => {
+  if (lineMode === b.dataset.line) return; setLineMode(b.dataset.line, true); calc(); saveInputs();
+});
+document.querySelectorAll('.toggle:not(#lineToggle) button').forEach(b => b.onclick = () => {
   if (mode === b.dataset.mode) return; mode = b.dataset.mode; recallCoverage(); calc(); saveInputs();
 });
 $('saveBtn').onclick = () => {
@@ -744,7 +768,7 @@ $('saveBtn').onclick = () => {
   const pSide = r.side ? (r.side === 'over' ? r.pOver : 1 - r.pOver) : null;
   const log = getLog();
   log.unshift({ date: new Date().toISOString().slice(0,10), player: r.player, opp: r.opp, week: r.week, proj: r.mean, fair: r.fair,
-    line: r.line, side: r.side, odds: r.side ? (r.side === 'over' ? r.oO : r.uO) : null, pSide, ev: r.side ? (r.side === 'over' ? r.evO : r.evU) : null,
+    line: r.line, book: lineMode === 'own' ? ($('myBook').value.trim() || 'Own line') : (window.__books && window.__books[+$('bookSel').value] ? window.__books[+$('bookSel').value].book : 'Manual'), side: r.side, odds: r.side ? (r.side === 'over' ? r.oO : r.uO) : null, pSide, ev: r.side ? (r.side === 'over' ? r.evO : r.evU) : null,
     actual: '', overOdds: r.oO, underOdds: r.uO, tsF: r.tsF, volF: r.volF, covRaw: r.covRaw, covF: r.covF, defF: r.defF, qbF: r.qbF, wxF: r.wxF,
     weight: r.w, seasonW: num('seasonW') });
   setLog(log);
@@ -767,7 +791,7 @@ $('clearBtn').onclick = () => { if (confirm('Delete every saved projection?')) s
   if (DATA && DATA.fits) FITS = DATA.fits;
   renderStatus();
   if (DATA) buildPicker();
-  loadInputs(); calc(); renderLog();
+  loadInputs(); setLineMode(lineMode, false); calc(); renderLog();
 })();
 })();
 </script>
