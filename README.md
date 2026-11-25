@@ -1,100 +1,97 @@
-# Receiving Yards Projection Model (WR/TE), v2
+# Receiving Yards Projection Model (WR/TE), v3
 
-A static web app (GitHub Pages) plus a free scheduled data job (GitHub Actions). You pick a player, and everything except your FTN coverage data fills in automatically.
+A static web app (GitHub Pages) plus a free scheduled data job (GitHub Actions). It has two views:
+- **Single player:** a full breakdown with every input editable.
+- **Slate:** every WR/TE on the week's slate in one sortable table, ranked by EV.
 
-## What's automated
+## What's automated vs. manual
 
 | Input | Source | Refresh |
 |---|---|---|
-| Season and last-4 yards per game, target shares | nflverse | Tue / Thu / Sat / Sun |
-| Teammate target shares and injury status (#13) | nflverse | Tue / Thu / Sat / Sun |
-| Team pass attempts, opponent and league yards per attempt | nflverse | Tue / Thu / Sat / Sun |
-| Spread, total, and projected pass attempts (#11) | nflverse schedules + fitted model | Tue / Thu / Sat / Sun |
-| QB list and Y/A, with starter selection (#7) | nflverse rosters + injuries | Tue / Thu / Sat / Sun |
-| Kickoff wind and precipitation (#8) | Open-Meteo, fetched live in your browser | Each time you load a player |
-| Sportsbook line and over/under odds, by book | The Odds API (free key), or **your own line** (toggle in box 7) | Thu / Sat / Sun |
-| **Coverage rates, YPRR splits, overall YPRR** | **You, from FTN Stats IQ** | Manual. Remembered per opponent and player for the week. |
+| Season and last-4 yards per game, target shares, aDOT, games played (from snap counts) | nflverse | Tue / Thu / Sat / Sun |
+| Team dropbacks and pass attempts; team dropbacks in each player's games | nflverse play-by-play | Tue / Thu / Sat / Sun |
+| Teammates + injury status (#13), QB options (#7), opponent's starting secondary + injury status (#10) | nflverse rosters, injuries, snap counts | Tue / Thu / Sat / Sun |
+| Spread, total, projected attempts (#11), opponent and league Y/A | nflverse + fitted model | Tue / Thu / Sat / Sun |
+| Kickoff weather (#8) | Open-Meteo, fetched live in your browser | Each time you load a player or open the slate |
+| Line and odds | The Odds API (free key), or "My own line" | Thu / Sat / Sun or manual |
+| **Coverage rates, YPRR splits, routes vs. each coverage, total routes, overall YPRR** | **You, from FTN Stats IQ** | Remembered per defense (weekly) and per player |
 
 ## Model
 
 ```
-Mean = Baseline YPG × TS factor × Volume × Coverage × Defense × QB × Weather
-
-Baseline YPG  = w × season YPG + (1−w) × last-4 YPG                   (#4, default w = 60%)
-TS factor     = projected TS ÷ blended TS                             (#13 sets projected TS)
-Volume        = projected attempts ÷ team average                     (#11)
-Coverage      = 1 + c × (matchup YPRR ÷ overall YPRR − 1)             (c = matchup confidence)
-Defense       = 1 + c × (opp Y/A allowed ÷ league Y/A − 1)
-QB            = this game's QB Y/A ÷ usual starter Y/A                (#7)
-Weather       = fitted wind factor (or indoor factor) × rain/snow factor   (#8)
-
-Fair line     = Mean × historical median ratio                        (#1)
-P(Over)       = share of historical outcomes above (line ÷ mean)      (#1)
-EV per $100   = P × profit − (1−P) × 100, at the book's odds          (#2)
-Edge flag     = |fair line − line| ÷ line > 20%                       (#6)
+Efficiency   = defense × DB injuries × QB × weather
+YPG method   = Baseline YPG (season/L4 blend) × TS factor × (proj. attempts ÷ avg) × coverage × efficiency
+Route method = Proj. dropbacks × route % × matchup YPRR × TS factor × efficiency          (#5)
+                 route % = your total routes ÷ team dropbacks in his games (automated)
+                 proj. dropbacks = proj. attempts × team dropbacks/attempts
+Mean         = (1 − w) × YPG method + w × route method     (w = 50% default; route method needs total routes)
+Coverage     = Σ rate × shrunk split YPRR ÷ overall YPRR                                      (#3)
+                 shrunk split = (routes × split + k × overall) ÷ (routes + k)
+Defense      = 1 + carry-over × (opp Y/A allowed ÷ league Y/A − 1)    (carry-over fitted by games played)
+Fair line, P(Over) = historical outcome distribution by mean AND player type (aDOT)          (#1, #12)
 ```
 
-### What the 2018–2025 fits found (refit every run)
-- **Fair line sits below the mean:** about 20% below for players averaging under 45 yards, 12% for 45–70, and 7% for 70+. This is why comparing a mean projection to a line leans over.
-- **Pass attempts follow the game total and the team's own average, not the spread.** The spread coefficient is about 0 (big favorites average 33.5 attempts, big underdogs 32.9). The weight on the team's average grows from 0.29 (3–5 games played) to 0.63 (10+ games).
-- **Wind (passing yards per attempt vs. the team's own norm):** 0–9 mph ×1.00, 10–14 ×0.97, 15–19 ×0.94, 20+ ×0.93. Indoors ×1.02.
-- **Backup-QB prior:** 6.36 Y/A, used to stabilize QBs with small samples.
-- **Rain/snow factor (0.95)** is an assumption, because free data has no historical precipitation. Tune it with your log.
+**"Both" coverage view (default):** enter man/zone *and* single/two-high splits.
+1. Each view gets its own shrunk coverage effect.
+2. The two effects are blended by how unusual this defense is on each, measured in standard deviations (SD): weight ∝ |SD from league avg| + 0.1.
+   - Team spread, 2023–25 FTN: man rate 40.2% ± 11.1 points; single-high rate 58.2% ± 7.0 points.
+   - The two rates are correlated (r = 0.54), which is why they're blended rather than added.
+   - Example: a 60%-man defense with an average shell is weighted 94% man/zone and 6% shell.
+3. Once you've entered 16+ defenses for the week, their average becomes the league baseline.
+4. Enter one side of each pair and the other fills in (zone = 100 − man). With total routes plus routes vs. one split, the other split's routes fill in too.
 
-## Repo layout
+**Coverage weighting rule** (applies within each view):
+1. If you entered routes for each split, those routes are used.
+2. If you only entered total routes, routes per split are estimated from the league coverage mix (41% man / 59% zone, 58% single-high / 42% two-high).
+3. If you entered no routes at all, the fallback weight (25%) is used.
+
+## What the data says (fits refresh each run; split reliability fitted once)
+
+| Finding | Number | Source |
+|---|---|---|
+| Routes needed before a split is 50% signal (k) | Man 608 · Zone 773 · Single-high 2,044 · Two-high 2,552 | FTN charting via nflverse, 2023–25, 244 WRs |
+| Cover 0–6 splits | Cover 1 ≈ 609, Cover 2 ≈ 645, Cover 4 ≈ 489. Cover 0, 2-Man, 3 and 6 showed **no** detectable signal (treated as overall YPRR) | Same |
+| What that means in practice | A WR with 150 routes vs. man gets about 20% weight on his man split | Same |
+| Defense Y/A carry-over | 7% (3–5 games) → 20% (6–9) → 27% (10+) | nflverse 2018–25 |
+| Missing starting CB / S | Opponent Y/A ×1.012 per CB, ×1.003 per S (small) | 4,252 games, 2018–25 |
+| Fair line below mean | about 20% (<45 yds) · 12% (45–70) · 5–12% (70+, depending on player type) | 11,500 WR/TE games |
+| Spread vs. pass attempts | About 0 once the game total and team average are known | 3,486 team games |
+| Wind (Y/A) | 10–14 mph ×0.97 · 15–19 ×0.94 · 20+ ×0.93 · indoors ×1.02 | 2,646 games |
+
+## Repo layout (must match exactly)
 
 ```
-index.html                         the app
-data/data.json                     generated by the workflow (don't edit)
-scripts/build_data.py              data builder
-requirements.txt                   Python packages for the builder
-.github/workflows/update-data.yml  schedule (Tue/Thu/Sat/Sun) + manual "Run workflow" button
+index.html
+README.md
+requirements.txt
+data/data.json                      (rebuilt by the workflow)
+data/fits_static.json               (coverage-split reliability; keep it)
+scripts/build_data.py
+scripts/fit_split_reliability.py    (one-time fit; the workflow doesn't run it)
+.github/workflows/update-data.yml
 ```
-
-## Setup (one time, about 15 minutes)
-
-1. **Get a free Odds API key.** Sign up for the free Starter plan at the-odds-api.com. The key arrives by email. The free plan has 500 credits/month, and each props pull costs about 1 credit per game (about 200/month on this schedule).
-2. **Add the key to GitHub.** In your repo, go to **Settings → Secrets and variables → Actions → New repository secret**. Name it `ODDS_API_KEY` and paste the key as the value. This keeps the key private; it never appears in the public page.
-3. **Allow the workflow to save data.** Go to **Settings → Actions → General → Workflow permissions**, select **Read and write permissions**, and click **Save**.
-4. **Upload the files.** Unzip the download. On the repo's main page, click **Add file → Upload files** and drag in everything *inside* the unzipped folder (`index.html`, `README.md`, `requirements.txt`, and the `data`, `scripts` and `.github` folders), then click **Commit changes**.
-   - On a Mac, `.github` is hidden. Press **Cmd + Shift + .** in Finder to show it.
-   - If the `.github` folder won't upload, click **Add file → Create new file**, type `.github/workflows/update-data.yml` as the name, paste the file's contents, and commit.
-5. **Run the data job once.** Open the **Actions** tab (click "I understand… enable workflows" if prompted), choose **Update model data → Run workflow → Run workflow**. It takes about 3–5 minutes. A green check means `data/data.json` was updated.
-6. **Open your site** and hard-refresh (Ctrl/Cmd + Shift + R). The top bar should show **"Data: 2026 Week N · stats updated …"**.
-
-After that, it updates itself on schedule. To pull fresh props before kickoff, run it manually again (step 5).
-
-## Odds API credits
-
-- **Cost:** 1 credit per game per props pull. A full week is about 14–16 games.
-- **Scheduled usage:** 3 props pulls a week (Thu/Sat/Sun) is about 45 credits/week, or about 195 a month. The Tuesday run is stats-only and uses no credits.
-- **Spare credits:** of the 500 free, about 300 are left over, which is room for about 20 manual pulls a month.
-- **Built-in protection:** the job stops pulling props when fewer than 25 credits remain, or right away if the API reports it's out. It keeps every line already pulled that week, so a partial pull never wipes out good data.
-- **If you run out:** switch box 7 to **"My own line"**. Credits reset on the 1st of each month. If you ever want unlimited pulls, the paid plan is $30/month for 20,000 credits.
-
-## Line source toggle (box 7)
-
-- **Auto (sportsbook feed):** pick a sportsbook from the dropdown, and the line and odds fill in.
-- **My own line:** type the line and odds yourself, plus an optional sportsbook name for the log. Loading a new player clears these fields, so another player's line can't carry over. The choice is remembered.
 
 ## Weekly workflow
 
-1. **Thursday onward:** open the site and pick a player in box 0.
-2. **Check the auto-filled values:** the injury pre-checks in the teammates table, the starting QB, and the forecast.
-3. **Enter your FTN Stats IQ numbers:** defense coverage rates, the player's YPRR splits, and overall YPRR.
-4. **Read the output:** P(Over) vs. the market's, the EV for each side, and whether the edge was flagged.
-5. **Save it to the log.** Enter the actual yards after the game. The log grades the model's side at 1 unit per bet.
+1. **Thursday onward:** check the top bar on the site for the current week and the props timestamp.
+2. **Slate tab, enter coverage once per defense:** fill in man % and single-high % for each defense in "Defense coverage rates" (the other side of each pair auto-fills).
+3. **Enter each player's FTN data in his row:** overall YPRR, his Man/Zone/1-Hi/2-Hi YPRR, total routes, and routes vs. Man and vs. 1-Hi (the other routes auto-fill).
+4. **Sort by EV/$100.** Blue rows are +EV with complete FTN data. ⚠ marks an edge flagged as unusually large.
+5. **Open a player** to check his teammates, defenders, QB and weather in detail.
+6. **Save the bets:** click **Save +EV bets to log** on the slate, or **Save to log** on a single player.
+7. **After the games:** enter actual yards in the log.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| No "Update model data" in the Actions tab | The workflow file isn't at the right path. It must be exactly `.github/workflows/update-data.yml` at the **top level** of the repo (not inside another folder, and spelled with the leading dot). Fix: **Add file → Create new file**, type `.github/workflows/update-data.yml` as the name, paste the file contents, and commit. |
-| "No data file found: manual mode" | Run the workflow (setup step 5), then hard-refresh the site. |
-| Workflow fails at "Commit updated data" with a 403 error | Redo setup step 3 (Read and write permissions). |
-| "No props posted" for every player | Props usually appear 1–3 days before kickoff. Run the workflow manually closer to the game. Also check that the `ODDS_API_KEY` secret exists. |
-| Props stopped updating late in the month | You've hit the credit reserve. Switch to "My own line" until credits reset on the 1st. |
-| Scheduled runs stopped (e.g. in the offseason) | GitHub pauses schedules in inactive public repos. Re-enable the workflow in the Actions tab. |
-| A value looks wrong | Every field is editable, and your edit overrides the auto value. |
+| No "Update model data" in the Actions tab | The workflow must be at exactly `.github/workflows/update-data.yml` at the top level. Create it with **Add file → Create new file**. |
+| Fails at **Check repo layout** | The red message names the missing file. Upload it at the path shown in the repo layout above. |
+| Fails at **Install dependencies** | Re-upload `requirements.txt` from the zip. |
+| Fails at **Build data/data.json** | Copy the last red lines from the step log. Usually it's a temporary download error, so re-run once. |
+| Fails at **Commit updated data** (403) | Go to **Settings → Actions → General → Workflow permissions → Read and write permissions**. |
+| "No data file found: manual mode" | Run the workflow, then hard-refresh. |
+| Slate shows 0 players | Untick "Only players with a line" (props may not be posted yet) or lower "Min season YPG". |
+| Props stopped late in the month | The credit reserve was reached. Use "My own line" until credits reset on the 1st. |
 
-Data: nflverse (CC-BY 4.0), The Odds API, Open-Meteo (CC-BY 4.0).
+Data: nflverse (CC-BY 4.0; FTN charting data via nflverse, CC-BY-SA 4.0), The Odds API, Open-Meteo (CC-BY 4.0).

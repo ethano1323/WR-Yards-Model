@@ -124,10 +124,12 @@
     <div class="toggle" id="modeToggle">
       <button type="button" data-mode="simple" class="active">Man / Zone</button>
       <button type="button" data-mode="shell">Single-high / Two-high</button>
+      <button type="button" data-mode="both">Both (recommended)</button>
       <button type="button" data-mode="detailed">Cover 0–6</button>
     </div>
-    <span class="hint" style="margin-bottom:10px">Use one view per projection. Coverage rates are remembered per opponent each week, and splits/routes per player.
-      In 2023–25 FTN charting, Man/Zone splits carried the most signal. Most Cover 0–6 splits showed none, so they lean on overall YPRR.</span>
+    <span class="hint" style="margin-bottom:10px"><b>Both</b> uses man/zone and single/two-high together. Each view's effect is weighted by how far this defense is from league average on it, measured in standard deviations.
+      Enter one rate per pair and the other auto-fills (zone = 100 − man). Enter total routes plus routes vs. one split and the other split's routes auto-fill.
+      Coverage rates are remembered per opponent each week, and splits/routes per player.</span>
     <table>
       <thead><tr><th>Coverage</th><th class="num">Def. rate %</th><th class="num">YPRR vs.</th><th class="num">Routes vs.</th><th class="num">Split weight</th></tr></thead>
       <tbody id="covBody"></tbody>
@@ -325,7 +327,7 @@ Mean         = blend of the two · Fair line = Mean × historical median ratio</
 (function(){
 'use strict';
 // Fallback fits used only if data/data.json can't be loaded.
-const FALLBACK_FITS = {"dist":[{"lo":0,"hi":45,"label":"<45","adLo":null,"adHi":null,"adLabel":"all types","n":6264,"q":[-0.2811,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0754,0.1239,0.1449,0.1677,0.1841,0.2003,0.2215,0.2393,0.2575,0.2756,0.2928,0.3111,0.3286,0.3491,0.3628,0.3784,0.3952,0.4094,0.4286,0.446,0.4622,0.4831,0.4988,0.5197,0.5378,0.5558,0.5712,0.5922,0.6131,0.6302,0.6512,0.6654,0.6852,0.7048,0.7232,0.7445,0.764,0.7817,0.8025,0.8289,0.8484,0.8652,0.8878,0.913,0.9363,0.9562,0.9735,0.9941,1.0179,1.0445,1.0706,1.093,1.1206,1.1499,1.1811,1.2066,1.2346,1.2609,1.2884,1.3224,1.3503,1.3859,1.4264,1.4514,1.4873,1.5259,1.5652,1.6078,1.6446,1.6798,1.7278,1.7661,1.8194,1.8859,1.9432,1.9952,2.0441,2.1061,2.1725,2.2547,2.3324,2.409,2.5255,2.6457,2.781,3.0108,3.3463,3.8124,7.0919]},{"lo":0,"hi":45,"label":"<45","adLo":-99,"adHi":8,"adLabel":"short (aDOT <8)","n":2377,"q":[-0.1512,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0531,0.1048,0.1339,0.1533,0.173,0.1884,0.2045,0.2261,0.2414,0.2575,0.2715,0.2856,0.3032,0.3182,0.3373,0.3551,0.374,0.3948,0.4097,0.427,0.4399,0.4673,0.4835,0.4969,0.5203,0.5352,0.5536,0.5697,0.5909,0.6135,0.6352,0.6516,0.6629,0.6847,0.7046,0.7211,0.7402,0.7648,0.7797,0.801,0.8187,0.8338,0.8473,0.8689,0.8909,0.9182,0.9394,0.9574,0.9763,0.9916,1.0186,1.0374,1.0623,1.0885,1.1154,1.1476,1.1755,1.1977,1.2193,1.2418,1.264,1.2918,1.3288,1.3516,1.3931,1.4241,1.4408,1.4684,1.4996,1.5387,1.5719,1.609,1.6381,1.6919,1.7248,1.7552,1.8188,1.8837,1.9354,1.9937,2.0387,2.0965,2.1634,2.243,2.336,2.3955,2.5208,2.6436,2.798,3.1526,3.5903,6.0281]},{"lo":0,"hi":45,"label":"<45","adLo":8,"adHi":12,"adLabel":"mid (aDOT 8-12)","n":2333,"q":[-0.2743,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0658,0.121,0.1491,0.1684,0.1796,0.1975,0.2128,0.2325,0.2504,0.2706,0.288,0.3081,0.3234,0.3429,0.3566,0.3677,0.3831,0.3977,0.4204,0.4426,0.4587,0.4772,0.4928,0.5144,0.5354,0.5514,0.5658,0.5875,0.6024,0.6163,0.6411,0.6546,0.6692,0.6858,0.7072,0.7263,0.7405,0.763,0.7813,0.8106,0.8351,0.8527,0.8728,0.8989,0.924,0.9382,0.9615,0.9816,1.009,1.035,1.0533,1.082,1.1049,1.1387,1.1753,1.2032,1.2223,1.2472,1.2704,1.309,1.3312,1.3673,1.4073,1.4507,1.4909,1.5319,1.5787,1.6093,1.639,1.6973,1.7236,1.7655,1.8506,1.8959,1.9471,2.0018,2.067,2.125,2.1997,2.2551,2.3228,2.4262,2.5569,2.6653,2.8241,3.1064,3.3886,3.8668,6.9206]},{"lo":0,"hi":45,"label":"<45","adLo":12,"adHi":99,"adLabel":"deep (aDOT 12+)","n":1426,"q":[-0.1812,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0397,0.0924,0.1398,0.1564,0.1892,0.2089,0.2414,0.2545,0.2753,0.3019,0.3162,0.3387,0.3543,0.3693,0.3892,0.4035,0.4174,0.4339,0.4502,0.4636,0.4738,0.4923,0.5058,0.5249,0.5427,0.565,0.5878,0.6088,0.6292,0.6522,0.6707,0.6944,0.715,0.7415,0.7597,0.7746,0.801,0.8179,0.8598,0.8804,0.8962,0.9217,0.9415,0.9647,0.9829,1.0024,1.032,1.0566,1.0934,1.1122,1.1334,1.1585,1.1852,1.2194,1.2443,1.2814,1.333,1.3673,1.3995,1.4354,1.4834,1.5142,1.5559,1.5994,1.63,1.6889,1.722,1.7564,1.8249,1.8813,1.9444,2.0105,2.0405,2.11,2.1726,2.28,2.3678,2.4232,2.5661,2.657,2.7602,2.949,3.1392,3.5305,3.9983,5.5582]},{"lo":45,"hi":70,"label":"45-70","adLo":null,"adHi":null,"adLabel":"all types","n":3543,"q":[-0.0621,0.0,0.0,0.0,0.0,0.0739,0.11,0.1344,0.1608,0.1838,0.2072,0.2332,0.2531,0.2771,0.2952,0.3164,0.3351,0.3504,0.3705,0.3851,0.4045,0.4242,0.4374,0.451,0.4696,0.4893,0.5058,0.5174,0.5347,0.5511,0.5664,0.5827,0.5999,0.6138,0.6289,0.6436,0.6571,0.672,0.6928,0.7113,0.725,0.7401,0.754,0.7689,0.784,0.8013,0.8173,0.833,0.8491,0.8679,0.883,0.8977,0.9113,0.9298,0.9481,0.9653,0.9815,1.0002,1.0181,1.0369,1.0558,1.0732,1.1009,1.1189,1.1425,1.1598,1.1767,1.2016,1.2226,1.2444,1.2627,1.2889,1.3105,1.3398,1.3663,1.3886,1.4181,1.4465,1.4786,1.5038,1.5398,1.5797,1.6059,1.6438,1.6796,1.716,1.7664,1.8051,1.841,1.8957,1.9476,2.0075,2.0674,2.1495,2.2244,2.2891,2.3915,2.4999,2.7675,3.0424,4.9864]},{"lo":45,"hi":70,"label":"45-70","adLo":-99,"adHi":8,"adLabel":"short (aDOT <8)","n":827,"q":[-0.0608,0.0,0.0486,0.0972,0.1136,0.1513,0.1792,0.1991,0.2322,0.2572,0.2785,0.2927,0.3048,0.3183,0.3411,0.3532,0.3669,0.3821,0.4052,0.4217,0.429,0.4442,0.4676,0.4871,0.4952,0.4993,0.5192,0.5341,0.551,0.561,0.5701,0.5908,0.6016,0.6115,0.6263,0.6397,0.6565,0.6848,0.6928,0.7096,0.7227,0.7384,0.753,0.7666,0.7753,0.7958,0.8127,0.8299,0.8524,0.863,0.8745,0.8872,0.9055,0.9157,0.9308,0.9417,0.9668,0.9825,1.0029,1.0344,1.0526,1.0633,1.0852,1.1019,1.119,1.1379,1.1502,1.1652,1.1986,1.2141,1.2306,1.2543,1.2741,1.2914,1.3158,1.3466,1.3735,1.4251,1.4491,1.4808,1.5064,1.5555,1.6018,1.644,1.6708,1.7218,1.7708,1.8129,1.8457,1.8917,1.9318,1.9954,2.059,2.1077,2.209,2.2688,2.3204,2.3948,2.6125,2.9327,4.1737]},{"lo":45,"hi":70,"label":"45-70","adLo":8,"adHi":12,"adLabel":"mid (aDOT 8-12)","n":1612,"q":[-0.0552,0.0,0.0,0.0,0.0361,0.0906,0.1244,0.1439,0.1648,0.1886,0.2078,0.2302,0.2521,0.2815,0.3115,0.3367,0.3517,0.3682,0.3885,0.4015,0.4188,0.4343,0.4487,0.4699,0.485,0.5023,0.5135,0.528,0.5431,0.5588,0.5765,0.5953,0.6119,0.6302,0.6411,0.6536,0.6718,0.6911,0.7039,0.7191,0.7324,0.7471,0.7583,0.7765,0.7929,0.8113,0.823,0.8323,0.849,0.8624,0.8762,0.8891,0.9101,0.9312,0.9444,0.961,0.9774,0.9906,1.0129,1.0286,1.043,1.059,1.0906,1.1157,1.1386,1.1619,1.1958,1.2139,1.2361,1.2563,1.2743,1.3003,1.3315,1.353,1.3756,1.4028,1.4214,1.4546,1.4768,1.5094,1.5416,1.5716,1.6087,1.6388,1.6683,1.7106,1.7516,1.7833,1.8183,1.8782,1.9504,1.9986,2.0476,2.1427,2.1952,2.2527,2.371,2.4497,2.7277,3.0267,3.7469]},{"lo":45,"hi":70,"label":"45-70","adLo":12,"adHi":99,"adLabel":"deep (aDOT 12+)","n":1103,"q":[-0.0325,0.0,0.0,0.0,0.0,0.0,0.0,0.0692,0.0913,0.1258,0.1498,0.1858,0.2052,0.2312,0.2564,0.2737,0.2892,0.3028,0.3257,0.3324,0.3524,0.3617,0.3861,0.4068,0.4313,0.45,0.4623,0.4762,0.4929,0.5156,0.54,0.559,0.5792,0.6011,0.6075,0.6265,0.6461,0.6572,0.67,0.6859,0.7,0.7233,0.7455,0.7621,0.7767,0.7912,0.8068,0.8277,0.8445,0.8598,0.8877,0.906,0.9261,0.9431,0.9602,0.9786,1.0047,1.0215,1.0425,1.0559,1.0766,1.0975,1.1166,1.1463,1.16,1.1834,1.194,1.2131,1.2324,1.2507,1.2652,1.284,1.3125,1.345,1.3712,1.403,1.4239,1.4576,1.4863,1.511,1.5437,1.5995,1.638,1.6566,1.687,1.7177,1.7751,1.8301,1.8676,1.9126,1.9755,2.0502,2.0964,2.1665,2.2829,2.363,2.4846,2.6629,2.8989,3.1899,5.1613]},{"lo":70,"hi":999,"label":"70+","adLo":null,"adHi":null,"adLabel":"all types","n":1681,"q":[-0.0627,0.0,0.0536,0.1148,0.1512,0.1736,0.2125,0.2484,0.2672,0.2949,0.3137,0.3312,0.3443,0.3652,0.3874,0.402,0.4133,0.4359,0.4515,0.4704,0.4849,0.5017,0.5155,0.5276,0.545,0.561,0.572,0.5889,0.6008,0.616,0.6331,0.6493,0.6621,0.6813,0.6929,0.7109,0.7196,0.7351,0.7535,0.7656,0.7812,0.7947,0.8094,0.8234,0.8351,0.8492,0.8675,0.8824,0.8939,0.9065,0.9263,0.9404,0.9537,0.9636,0.9792,0.9954,1.0072,1.0225,1.0342,1.0469,1.0609,1.0786,1.0982,1.1157,1.1318,1.1445,1.1669,1.1806,1.203,1.2219,1.2485,1.265,1.2865,1.3111,1.3378,1.3595,1.3761,1.4024,1.4188,1.4331,1.4495,1.4781,1.4912,1.5223,1.5511,1.5846,1.6215,1.6675,1.6998,1.7265,1.7688,1.825,1.8722,1.953,2.0365,2.1302,2.1974,2.2986,2.4384,2.7089,4.3106]},{"lo":70,"hi":999,"label":"70+","adLo":8,"adHi":12,"adLabel":"mid (aDOT 8-12)","n":936,"q":[-0.0302,0.0,0.0866,0.1246,0.1541,0.1828,0.2243,0.258,0.2761,0.3081,0.3216,0.3418,0.3628,0.3786,0.4014,0.4094,0.4368,0.4521,0.4649,0.4823,0.4926,0.5117,0.5233,0.5442,0.564,0.5768,0.5935,0.6097,0.6248,0.6423,0.6531,0.6684,0.682,0.6967,0.7146,0.7194,0.7353,0.7559,0.774,0.7899,0.8065,0.8159,0.8265,0.8371,0.8532,0.8759,0.8915,0.8996,0.9157,0.9316,0.9445,0.9591,0.9695,0.9805,0.9942,1.0063,1.0217,1.0298,1.0439,1.0523,1.0655,1.0796,1.0933,1.1113,1.1219,1.1345,1.1462,1.1675,1.1941,1.2201,1.2377,1.2592,1.2742,1.2926,1.3347,1.351,1.3613,1.3761,1.4056,1.4193,1.4303,1.449,1.4842,1.4927,1.5471,1.5842,1.6162,1.6541,1.6839,1.727,1.7678,1.8007,1.8474,1.9368,1.9711,2.1285,2.192,2.2827,2.3992,2.5911,3.7919]},{"lo":70,"hi":999,"label":"70+","adLo":12,"adHi":99,"adLabel":"deep (aDOT 12+)","n":510,"q":[-0.063,0.0,0.0354,0.0864,0.1313,0.1629,0.1938,0.2332,0.2666,0.2824,0.301,0.3101,0.3286,0.3375,0.3552,0.3764,0.3958,0.405,0.4164,0.4357,0.4462,0.4718,0.4991,0.5135,0.5224,0.5372,0.5481,0.5595,0.5679,0.5891,0.5996,0.6098,0.6259,0.6388,0.6471,0.6845,0.6962,0.7145,0.7254,0.7392,0.753,0.7701,0.7787,0.7878,0.805,0.8157,0.835,0.8437,0.8581,0.8714,0.8853,0.8934,0.9024,0.9246,0.9382,0.9538,0.9667,0.9857,1.0049,1.0159,1.0359,1.0478,1.0602,1.0936,1.1089,1.1396,1.1741,1.1834,1.2103,1.222,1.2505,1.2694,1.291,1.3053,1.3435,1.3797,1.4024,1.4194,1.4399,1.4527,1.4744,1.4939,1.5114,1.5444,1.5653,1.5795,1.6408,1.6972,1.7141,1.735,1.8216,1.9222,1.9596,2.051,2.133,2.1878,2.246,2.3586,2.5642,2.9297,4.332]}],"passAtt":[{"minG":0,"maxG":5,"b0":13.824,"bAvg":0.2936,"bSpread":0.0028,"bTotal":0.225,"r2":0.057,"sd":8.16,"n":768},{"minG":6,"maxG":9,"b0":9.704,"bAvg":0.4739,"bSpread":0.0631,"bTotal":0.1688,"r2":0.08,"sd":7.94,"n":1024},{"minG":10,"maxG":98,"b0":-1.071,"bAvg":0.6283,"bSpread":-0.0144,"bTotal":0.2961,"r2":0.13,"sd":7.61,"n":1694}],"wind":{"indoor":{"factor":1.023,"n":1280},"buckets":[{"lo":0,"hi":10,"label":"0-9 mph","factor":1.003,"n":1742},{"lo":10,"hi":15,"label":"10-14 mph","factor":0.971,"n":598},{"lo":15,"hi":20,"label":"15-19 mph","factor":0.941,"n":244},{"lo":20,"hi":99,"label":"20+ mph","factor":0.926,"n":62}]},"qbPrior":6.36,"defWeight":[{"minG":0,"maxG":5,"w":0.065,"n":768},{"minG":6,"maxG":9,"w":0.195,"n":1024},{"minG":10,"maxG":98,"w":0.274,"n":1692}],"dbInj":{"cb":1.012,"s":1.0034,"n":4252,"gamesMissingCB":1062,"gamesMissingS":622},"seasons":"2018-2025","splitShrink":{"man":{"r_half":0.135,"routes_per_half":94.7,"k":608,"players":244},"zone":{"r_half":0.151,"routes_per_half":137.3,"k":773,"players":244},"single":{"r_half":0.059,"routes_per_half":128.3,"k":2044,"players":233},"two":{"r_half":0.036,"routes_per_half":94.9,"k":2552,"players":233},"COVER_0":{"r_half":-0.203,"routes_per_half":11.8,"k":null,"players":90},"COVER_1":{"r_half":0.105,"routes_per_half":71.4,"k":609,"players":244},"COVER_2":{"r_half":0.066,"routes_per_half":45.3,"k":645,"players":244},"2_MAN":{"r_half":-0.02,"routes_per_half":17.5,"k":null,"players":193},"COVER_3":{"r_half":-0.035,"routes_per_half":46.4,"k":null,"players":244},"COVER_4":{"r_half":0.046,"routes_per_half":23.3,"k":489,"players":231},"COVER_6":{"r_half":-0.066,"routes_per_half":13.2,"k":null,"players":152},"shares":{"simple":[0.407,0.593],"shell":[0.576,0.424],"detailed":[0.036,0.307,0.196,0.064,0.204,0.096,0.047,0.051]},"recommended_k":690,"seasons":"2023-2025"}};
+const FALLBACK_FITS = {"dist":[{"lo":0,"hi":45,"label":"<45","adLo":null,"adHi":null,"adLabel":"all types","n":6264,"q":[-0.2811,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0754,0.1239,0.1449,0.1677,0.1841,0.2003,0.2215,0.2393,0.2575,0.2756,0.2928,0.3111,0.3286,0.3491,0.3628,0.3784,0.3952,0.4094,0.4286,0.446,0.4622,0.4831,0.4988,0.5197,0.5378,0.5558,0.5712,0.5922,0.6131,0.6302,0.6512,0.6654,0.6852,0.7048,0.7232,0.7445,0.764,0.7817,0.8025,0.8289,0.8484,0.8652,0.8878,0.913,0.9363,0.9562,0.9735,0.9941,1.0179,1.0445,1.0706,1.093,1.1206,1.1499,1.1811,1.2066,1.2346,1.2609,1.2884,1.3224,1.3503,1.3859,1.4264,1.4514,1.4873,1.5259,1.5652,1.6078,1.6446,1.6798,1.7278,1.7661,1.8194,1.8859,1.9432,1.9952,2.0441,2.1061,2.1725,2.2547,2.3324,2.409,2.5255,2.6457,2.781,3.0108,3.3463,3.8124,7.0919]},{"lo":0,"hi":45,"label":"<45","adLo":-99,"adHi":8,"adLabel":"short (aDOT <8)","n":2377,"q":[-0.1512,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0531,0.1048,0.1339,0.1533,0.173,0.1884,0.2045,0.2261,0.2414,0.2575,0.2715,0.2856,0.3032,0.3182,0.3373,0.3551,0.374,0.3948,0.4097,0.427,0.4399,0.4673,0.4835,0.4969,0.5203,0.5352,0.5536,0.5697,0.5909,0.6135,0.6352,0.6516,0.6629,0.6847,0.7046,0.7211,0.7402,0.7648,0.7797,0.801,0.8187,0.8338,0.8473,0.8689,0.8909,0.9182,0.9394,0.9574,0.9763,0.9916,1.0186,1.0374,1.0623,1.0885,1.1154,1.1476,1.1755,1.1977,1.2193,1.2418,1.264,1.2918,1.3288,1.3516,1.3931,1.4241,1.4408,1.4684,1.4996,1.5387,1.5719,1.609,1.6381,1.6919,1.7248,1.7552,1.8188,1.8837,1.9354,1.9937,2.0387,2.0965,2.1634,2.243,2.336,2.3955,2.5208,2.6436,2.798,3.1526,3.5903,6.0281]},{"lo":0,"hi":45,"label":"<45","adLo":8,"adHi":12,"adLabel":"mid (aDOT 8-12)","n":2333,"q":[-0.2743,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0658,0.121,0.1491,0.1684,0.1796,0.1975,0.2128,0.2325,0.2504,0.2706,0.288,0.3081,0.3234,0.3429,0.3566,0.3677,0.3831,0.3977,0.4204,0.4426,0.4587,0.4772,0.4928,0.5144,0.5354,0.5514,0.5658,0.5875,0.6024,0.6163,0.6411,0.6546,0.6692,0.6858,0.7072,0.7263,0.7405,0.763,0.7813,0.8106,0.8351,0.8527,0.8728,0.8989,0.924,0.9382,0.9615,0.9816,1.009,1.035,1.0533,1.082,1.1049,1.1387,1.1753,1.2032,1.2223,1.2472,1.2704,1.309,1.3312,1.3673,1.4073,1.4507,1.4909,1.5319,1.5787,1.6093,1.639,1.6973,1.7236,1.7655,1.8506,1.8959,1.9471,2.0018,2.067,2.125,2.1997,2.2551,2.3228,2.4262,2.5569,2.6653,2.8241,3.1064,3.3886,3.8668,6.9206]},{"lo":0,"hi":45,"label":"<45","adLo":12,"adHi":99,"adLabel":"deep (aDOT 12+)","n":1426,"q":[-0.1812,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0397,0.0924,0.1398,0.1564,0.1892,0.2089,0.2414,0.2545,0.2753,0.3019,0.3162,0.3387,0.3543,0.3693,0.3892,0.4035,0.4174,0.4339,0.4502,0.4636,0.4738,0.4923,0.5058,0.5249,0.5427,0.565,0.5878,0.6088,0.6292,0.6522,0.6707,0.6944,0.715,0.7415,0.7597,0.7746,0.801,0.8179,0.8598,0.8804,0.8962,0.9217,0.9415,0.9647,0.9829,1.0024,1.032,1.0566,1.0934,1.1122,1.1334,1.1585,1.1852,1.2194,1.2443,1.2814,1.333,1.3673,1.3995,1.4354,1.4834,1.5142,1.5559,1.5994,1.63,1.6889,1.722,1.7564,1.8249,1.8813,1.9444,2.0105,2.0405,2.11,2.1726,2.28,2.3678,2.4232,2.5661,2.657,2.7602,2.949,3.1392,3.5305,3.9983,5.5582]},{"lo":45,"hi":70,"label":"45-70","adLo":null,"adHi":null,"adLabel":"all types","n":3543,"q":[-0.0621,0.0,0.0,0.0,0.0,0.0739,0.11,0.1344,0.1608,0.1838,0.2072,0.2332,0.2531,0.2771,0.2952,0.3164,0.3351,0.3504,0.3705,0.3851,0.4045,0.4242,0.4374,0.451,0.4696,0.4893,0.5058,0.5174,0.5347,0.5511,0.5664,0.5827,0.5999,0.6138,0.6289,0.6436,0.6571,0.672,0.6928,0.7113,0.725,0.7401,0.754,0.7689,0.784,0.8013,0.8173,0.833,0.8491,0.8679,0.883,0.8977,0.9113,0.9298,0.9481,0.9653,0.9815,1.0002,1.0181,1.0369,1.0558,1.0732,1.1009,1.1189,1.1425,1.1598,1.1767,1.2016,1.2226,1.2444,1.2627,1.2889,1.3105,1.3398,1.3663,1.3886,1.4181,1.4465,1.4786,1.5038,1.5398,1.5797,1.6059,1.6438,1.6796,1.716,1.7664,1.8051,1.841,1.8957,1.9476,2.0075,2.0674,2.1495,2.2244,2.2891,2.3915,2.4999,2.7675,3.0424,4.9864]},{"lo":45,"hi":70,"label":"45-70","adLo":-99,"adHi":8,"adLabel":"short (aDOT <8)","n":827,"q":[-0.0608,0.0,0.0486,0.0972,0.1136,0.1513,0.1792,0.1991,0.2322,0.2572,0.2785,0.2927,0.3048,0.3183,0.3411,0.3532,0.3669,0.3821,0.4052,0.4217,0.429,0.4442,0.4676,0.4871,0.4952,0.4993,0.5192,0.5341,0.551,0.561,0.5701,0.5908,0.6016,0.6115,0.6263,0.6397,0.6565,0.6848,0.6928,0.7096,0.7227,0.7384,0.753,0.7666,0.7753,0.7958,0.8127,0.8299,0.8524,0.863,0.8745,0.8872,0.9055,0.9157,0.9308,0.9417,0.9668,0.9825,1.0029,1.0344,1.0526,1.0633,1.0852,1.1019,1.119,1.1379,1.1502,1.1652,1.1986,1.2141,1.2306,1.2543,1.2741,1.2914,1.3158,1.3466,1.3735,1.4251,1.4491,1.4808,1.5064,1.5555,1.6018,1.644,1.6708,1.7218,1.7708,1.8129,1.8457,1.8917,1.9318,1.9954,2.059,2.1077,2.209,2.2688,2.3204,2.3948,2.6125,2.9327,4.1737]},{"lo":45,"hi":70,"label":"45-70","adLo":8,"adHi":12,"adLabel":"mid (aDOT 8-12)","n":1612,"q":[-0.0552,0.0,0.0,0.0,0.0361,0.0906,0.1244,0.1439,0.1648,0.1886,0.2078,0.2302,0.2521,0.2815,0.3115,0.3367,0.3517,0.3682,0.3885,0.4015,0.4188,0.4343,0.4487,0.4699,0.485,0.5023,0.5135,0.528,0.5431,0.5588,0.5765,0.5953,0.6119,0.6302,0.6411,0.6536,0.6718,0.6911,0.7039,0.7191,0.7324,0.7471,0.7583,0.7765,0.7929,0.8113,0.823,0.8323,0.849,0.8624,0.8762,0.8891,0.9101,0.9312,0.9444,0.961,0.9774,0.9906,1.0129,1.0286,1.043,1.059,1.0906,1.1157,1.1386,1.1619,1.1958,1.2139,1.2361,1.2563,1.2743,1.3003,1.3315,1.353,1.3756,1.4028,1.4214,1.4546,1.4768,1.5094,1.5416,1.5716,1.6087,1.6388,1.6683,1.7106,1.7516,1.7833,1.8183,1.8782,1.9504,1.9986,2.0476,2.1427,2.1952,2.2527,2.371,2.4497,2.7277,3.0267,3.7469]},{"lo":45,"hi":70,"label":"45-70","adLo":12,"adHi":99,"adLabel":"deep (aDOT 12+)","n":1103,"q":[-0.0325,0.0,0.0,0.0,0.0,0.0,0.0,0.0692,0.0913,0.1258,0.1498,0.1858,0.2052,0.2312,0.2564,0.2737,0.2892,0.3028,0.3257,0.3324,0.3524,0.3617,0.3861,0.4068,0.4313,0.45,0.4623,0.4762,0.4929,0.5156,0.54,0.559,0.5792,0.6011,0.6075,0.6265,0.6461,0.6572,0.67,0.6859,0.7,0.7233,0.7455,0.7621,0.7767,0.7912,0.8068,0.8277,0.8445,0.8598,0.8877,0.906,0.9261,0.9431,0.9602,0.9786,1.0047,1.0215,1.0425,1.0559,1.0766,1.0975,1.1166,1.1463,1.16,1.1834,1.194,1.2131,1.2324,1.2507,1.2652,1.284,1.3125,1.345,1.3712,1.403,1.4239,1.4576,1.4863,1.511,1.5437,1.5995,1.638,1.6566,1.687,1.7177,1.7751,1.8301,1.8676,1.9126,1.9755,2.0502,2.0964,2.1665,2.2829,2.363,2.4846,2.6629,2.8989,3.1899,5.1613]},{"lo":70,"hi":999,"label":"70+","adLo":null,"adHi":null,"adLabel":"all types","n":1681,"q":[-0.0627,0.0,0.0536,0.1148,0.1512,0.1736,0.2125,0.2484,0.2672,0.2949,0.3137,0.3312,0.3443,0.3652,0.3874,0.402,0.4133,0.4359,0.4515,0.4704,0.4849,0.5017,0.5155,0.5276,0.545,0.561,0.572,0.5889,0.6008,0.616,0.6331,0.6493,0.6621,0.6813,0.6929,0.7109,0.7196,0.7351,0.7535,0.7656,0.7812,0.7947,0.8094,0.8234,0.8351,0.8492,0.8675,0.8824,0.8939,0.9065,0.9263,0.9404,0.9537,0.9636,0.9792,0.9954,1.0072,1.0225,1.0342,1.0469,1.0609,1.0786,1.0982,1.1157,1.1318,1.1445,1.1669,1.1806,1.203,1.2219,1.2485,1.265,1.2865,1.3111,1.3378,1.3595,1.3761,1.4024,1.4188,1.4331,1.4495,1.4781,1.4912,1.5223,1.5511,1.5846,1.6215,1.6675,1.6998,1.7265,1.7688,1.825,1.8722,1.953,2.0365,2.1302,2.1974,2.2986,2.4384,2.7089,4.3106]},{"lo":70,"hi":999,"label":"70+","adLo":8,"adHi":12,"adLabel":"mid (aDOT 8-12)","n":936,"q":[-0.0302,0.0,0.0866,0.1246,0.1541,0.1828,0.2243,0.258,0.2761,0.3081,0.3216,0.3418,0.3628,0.3786,0.4014,0.4094,0.4368,0.4521,0.4649,0.4823,0.4926,0.5117,0.5233,0.5442,0.564,0.5768,0.5935,0.6097,0.6248,0.6423,0.6531,0.6684,0.682,0.6967,0.7146,0.7194,0.7353,0.7559,0.774,0.7899,0.8065,0.8159,0.8265,0.8371,0.8532,0.8759,0.8915,0.8996,0.9157,0.9316,0.9445,0.9591,0.9695,0.9805,0.9942,1.0063,1.0217,1.0298,1.0439,1.0523,1.0655,1.0796,1.0933,1.1113,1.1219,1.1345,1.1462,1.1675,1.1941,1.2201,1.2377,1.2592,1.2742,1.2926,1.3347,1.351,1.3613,1.3761,1.4056,1.4193,1.4303,1.449,1.4842,1.4927,1.5471,1.5842,1.6162,1.6541,1.6839,1.727,1.7678,1.8007,1.8474,1.9368,1.9711,2.1285,2.192,2.2827,2.3992,2.5911,3.7919]},{"lo":70,"hi":999,"label":"70+","adLo":12,"adHi":99,"adLabel":"deep (aDOT 12+)","n":510,"q":[-0.063,0.0,0.0354,0.0864,0.1313,0.1629,0.1938,0.2332,0.2666,0.2824,0.301,0.3101,0.3286,0.3375,0.3552,0.3764,0.3958,0.405,0.4164,0.4357,0.4462,0.4718,0.4991,0.5135,0.5224,0.5372,0.5481,0.5595,0.5679,0.5891,0.5996,0.6098,0.6259,0.6388,0.6471,0.6845,0.6962,0.7145,0.7254,0.7392,0.753,0.7701,0.7787,0.7878,0.805,0.8157,0.835,0.8437,0.8581,0.8714,0.8853,0.8934,0.9024,0.9246,0.9382,0.9538,0.9667,0.9857,1.0049,1.0159,1.0359,1.0478,1.0602,1.0936,1.1089,1.1396,1.1741,1.1834,1.2103,1.222,1.2505,1.2694,1.291,1.3053,1.3435,1.3797,1.4024,1.4194,1.4399,1.4527,1.4744,1.4939,1.5114,1.5444,1.5653,1.5795,1.6408,1.6972,1.7141,1.735,1.8216,1.9222,1.9596,2.051,2.133,2.1878,2.246,2.3586,2.5642,2.9297,4.332]}],"passAtt":[{"minG":0,"maxG":5,"b0":13.824,"bAvg":0.2936,"bSpread":0.0028,"bTotal":0.225,"r2":0.057,"sd":8.16,"n":768},{"minG":6,"maxG":9,"b0":9.704,"bAvg":0.4739,"bSpread":0.0631,"bTotal":0.1688,"r2":0.08,"sd":7.94,"n":1024},{"minG":10,"maxG":98,"b0":-1.071,"bAvg":0.6283,"bSpread":-0.0144,"bTotal":0.2961,"r2":0.13,"sd":7.61,"n":1694}],"wind":{"indoor":{"factor":1.023,"n":1280},"buckets":[{"lo":0,"hi":10,"label":"0-9 mph","factor":1.003,"n":1742},{"lo":10,"hi":15,"label":"10-14 mph","factor":0.971,"n":598},{"lo":15,"hi":20,"label":"15-19 mph","factor":0.941,"n":244},{"lo":20,"hi":99,"label":"20+ mph","factor":0.926,"n":62}]},"qbPrior":6.36,"defWeight":[{"minG":0,"maxG":5,"w":0.065,"n":768},{"minG":6,"maxG":9,"w":0.195,"n":1024},{"minG":10,"maxG":98,"w":0.274,"n":1692}],"dbInj":{"cb":1.012,"s":1.0034,"n":4252,"gamesMissingCB":1062,"gamesMissingS":622},"seasons":"2018-2025","splitShrink":{"man":{"r_half":0.135,"routes_per_half":94.7,"k":608,"players":244},"zone":{"r_half":0.151,"routes_per_half":137.3,"k":773,"players":244},"single":{"r_half":0.059,"routes_per_half":128.3,"k":2044,"players":233},"two":{"r_half":0.036,"routes_per_half":94.9,"k":2552,"players":233},"COVER_0":{"r_half":-0.203,"routes_per_half":11.8,"k":null,"players":90},"COVER_1":{"r_half":0.105,"routes_per_half":71.4,"k":609,"players":244},"COVER_2":{"r_half":0.066,"routes_per_half":45.3,"k":645,"players":244},"2_MAN":{"r_half":-0.02,"routes_per_half":17.5,"k":null,"players":193},"COVER_3":{"r_half":-0.035,"routes_per_half":46.4,"k":null,"players":244},"COVER_4":{"r_half":0.046,"routes_per_half":23.3,"k":489,"players":231},"COVER_6":{"r_half":-0.066,"routes_per_half":13.2,"k":null,"players":152},"shares":{"simple":[0.407,0.593],"shell":[0.576,0.424],"detailed":[0.036,0.307,0.196,0.064,0.204,0.096,0.047,0.051]},"teamRates":{"simple":{"mean":0.402,"sd":0.111},"shell":{"mean":0.582,"sd":0.07},"corr":0.54,"teamSeasons":96},"recommended_k":690,"seasons":"2023-2025"}};
 
 const COVERAGES = {
   simple:   ['Man', 'Zone'],
@@ -334,6 +336,11 @@ const COVERAGES = {
 };
 const SHRINK_KEYS = { simple:['man','zone'], shell:['single','two'],
   detailed:['COVER_0','COVER_1','COVER_2','2_MAN','COVER_3','COVER_4','COVER_6',null] };
+const MODES = { simple:['simple'], shell:['shell'], both:['simple','shell'], detailed:['detailed'] };
+const MODE_LABEL = { simple:'Man / Zone', shell:'Single-high / Two-high', both:'Both: Man/Zone + Single/Two-high', detailed:'Cover 0–6' };
+const DIM_LABEL = { simple:'Man/Zone', shell:'Single/Two-high', detailed:'Cover 0–6' };
+const DIM_SHARE = { simple:'man rate', shell:'single-high rate' };
+const SHORT = { simple:['Man','Zone'], shell:['1-Hi','2-Hi'], detailed:['C0','C1','C2','2M','C3','C4','C6','Oth'] };
 const NOSIG_K = 5000;   // "no detectable signal": split is essentially replaced by overall YPRR
 const STADIUMS = {
   ARI:[33.5276,-112.2626,'r'], ATL:[33.7554,-84.4008,'r'], BAL:[39.2780,-76.6227,'o'], BUF:[42.7738,-78.7870,'o'],
@@ -367,7 +374,7 @@ const store = {
   set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
 };
 
-let DATA = null, FITS = FALLBACK_FITS, mode = 'simple', curId = null;
+let DATA = null, FITS = FALLBACK_FITS, mode = 'both', curId = null;
 let out = new Set(), dbOut = new Set();
 let lineMode = store.get(K.lineMode) === 'own' ? 'own' : 'auto';
 const wxCache = {};
@@ -414,6 +421,59 @@ const ev = (p, o) => p*profit(o) - (1-p)*100;
 const fmtOdds = o => (o > 0 ? '+' : '') + o;
 function blendTS(ts, l4, ws){ return l4 == null ? ts : ws*ts + (1-ws)*l4; }
 
+// ---------- coverage helpers ----------
+// Two-option pairs: fill the blank side with 100 − the entered side.
+function fillRates(r){
+  const a = r.map(v => v == null ? null : Math.max(0, v));
+  if (a.length === 2){
+    if (a[0] != null && a[1] == null && a[0] <= 100) a[1] = 100 - a[0];
+    else if (a[1] != null && a[0] == null && a[1] <= 100) a[0] = 100 - a[1];
+  }
+  return a.map(v => v ?? 0);
+}
+function normRates(r){ const a = fillRates(r), s = a.reduce((x,y) => x+y, 0); return s > 0 ? a.map(v => v/s) : null; }
+// Two-option pairs: routes vs the other split = total routes − routes vs the entered split.
+function fillRoutes(rb, yp, total){
+  const a = [...rb];
+  if (a.length === 2 && total > 0){
+    if (a[0] > 0 && !(a[1] > 0) && yp[1] != null) a[1] = Math.max(0, total - a[0]);
+    else if (a[1] > 0 && !(a[0] > 0) && yp[0] != null) a[0] = Math.max(0, total - a[1]);
+  }
+  return a;
+}
+// League tendency: your own entered defenses this week (16+), otherwise the 2023-25 FTN average.
+function leagueRate(dim){
+  const tr = FITS && FITS.splitShrink && FITS.splitShrink.teamRates;
+  const hist = (tr && tr[dim]) || ({ simple:{ mean:0.402, sd:0.111 }, shell:{ mean:0.582, sd:0.07 } })[dim];
+  if (!hist) return null;
+  const wk = DATA ? String(DATA.meta.week) : $('week').value.trim(), m = mem(), shares = [];
+  Object.keys(m).forEach(k => { const q = k.split('|');
+    if (q[0] === 'cov' && q[1] === wk && q[3] === dim){ const r = normRates(m[k].map(pnum)); if (r) shares.push(r[0]); } });
+  if (shares.length >= 16) return { mean: shares.reduce((a,b) => a+b, 0)/shares.length, sd: hist.sd, src: `average of your ${shares.length} defenses this week` };
+  return { mean: hist.mean, sd: hist.sd, src: '2023–25 FTN average' };
+}
+// One coverage dimension: shrunk matchup factor + how unusual this defense is on it.
+function covDim(D, I, S){
+  const p = normRates(D.rates); if (!p) return null;
+  const ks = kList(D.dim, S.kMult), sh = covShares(D.dim);
+  const y = D.yprrs.map(v => v == null ? I.yprrAll : v), given = D.yprrs.map(v => v != null);
+  const rawY = p.reduce((a,pi,i) => a + pi*y[i], 0), rb = fillRoutes(D.routesBy, D.yprrs, I.routesTotal);
+  let method, res;
+  if (!given.some(Boolean)) method = 'none';
+  else if (D.yprrs.every((v,i) => v == null || rb[i] > 0)) method = 'routes';
+  else if (I.routesTotal > 0 && sh) method = 'estimated';
+  else method = 'legacy';
+  if (method === 'none') res = { f: 1, rows: [] };
+  else if (method === 'legacy'){ res = { f: 1 + S.wLegacy*(rawY/I.yprrAll - 1), rows: y.map(() => ({ wt: S.wLegacy })) }; }
+  else {
+    const rts = method === 'routes' ? rb.map(r => r || 0) : sh.map(x => I.routesTotal*x);
+    const rows = y.map((yi,i) => { const n = given[i] ? rts[i] : 0, wt = n/(n + ks[i]); return { wt, n, adj: wt*yi + (1-wt)*I.yprrAll }; });
+    res = { f: p.reduce((a,pi,i) => a + pi*rows[i].adj, 0) / I.yprrAll, rows };
+  }
+  const lr = D.dim === 'detailed' ? null : leagueRate(D.dim), z = lr ? (p[0] - lr.mean) / lr.sd : null;
+  return Object.assign(res, { dim: D.dim, raw: rawY/I.yprrAll, method, share: p[0], league: lr, z });
+}
+
 // ====================================================================================
 // THE MODEL (pure function shared by Single player and Slate)
 // ====================================================================================
@@ -421,11 +481,11 @@ function model(I){
   const E = [], W = [], S = I.set;
   if (I.ypg == null) E.push('Season receiving yards / game is required.');
   if (I.line == null || I.line <= 0) E.push('Sportsbook yardage line is required.');
-  const sum = I.rates.reduce((a,b) => a + (b || 0), 0);
-  const hasFTN = I.yprrAll > 0 && sum > 0;
+  const active = (I.dims || []).filter(D => D.rates.some(v => v != null && v > 0));
+  const hasFTN = I.yprrAll > 0 && active.length > 0;
   if (I.strict){
     if (!(I.yprrAll > 0)) E.push('Overall YPRR is required (FTN).');
-    if (sum <= 0) E.push('Enter the defense coverage rates (FTN).');
+    if (!active.length) E.push('Enter the defense coverage rates (FTN).');
   } else if (!hasFTN) W.push('No FTN data');
   if (E.length) return { errors: E };
 
@@ -434,25 +494,14 @@ function model(I){
   const tsF = I.projTS != null && bTS ? I.projTS / bTS : 1;
   const volF = I.attAvg && I.projAtt ? I.projAtt / I.attAvg : 1;
 
-  // --- #3 coverage with sample-size shrinkage
-  let cov = { f:1, raw:1, mY:I.yprrAll || null, method:'none', rows:[] };
+  // --- #3 coverage with sample-size shrinkage; "Both" blends dimensions by how unusual the defense is on each
+  let cov = { f:1, raw:1, mY:I.yprrAll || null, method:'none', dims:[] };
   if (hasFTN){
-    const ks = kList(I.mode, S.kMult), sh = covShares(I.mode);
-    const y = I.yprrs.map(v => v == null ? I.yprrAll : v), given = I.yprrs.map(v => v != null);
-    const p = I.rates.map(r => (r || 0) / sum);
-    const rawY = p.reduce((a,pi,i) => a + pi*y[i], 0);
-    const perSplit = given.some(Boolean) && I.yprrs.every((v,i) => v == null || I.routesBy[i] > 0);
-    let method = perSplit ? 'routes' : (I.routesTotal > 0 && sh ? 'estimated' : 'legacy');
-    if (!given.some(Boolean)) method = 'none';
-    if (method === 'legacy'){
-      const f = 1 + S.wLegacy*(rawY/I.yprrAll - 1);
-      cov = { f, raw: rawY/I.yprrAll, mY: I.yprrAll*f, method, rows: y.map(() => ({ wt: S.wLegacy })) };
-    } else if (method !== 'none'){
-      const rts = method === 'routes' ? I.routesBy.map(r => r || 0) : sh.map(s => I.routesTotal*s);
-      const rows = y.map((yi,i) => { const n = given[i] ? rts[i] : 0, wt = n/(n + ks[i]); return { wt, n, k: ks[i], adj: wt*yi + (1-wt)*I.yprrAll }; });
-      const mY = p.reduce((a,pi,i) => a + pi*rows[i].adj, 0);
-      cov = { f: mY/I.yprrAll, raw: rawY/I.yprrAll, mY, method, rows };
-    }
+    const ds = active.map(D => covDim(D, I, S)).filter(Boolean);
+    const a = ds.map(d => (d.z == null ? 1 : Math.abs(d.z)) + 0.1), tot = a.reduce((x,y) => x+y, 0);
+    ds.forEach((d,i) => d.w = a[i]/tot);
+    const f = ds.reduce((acc,d) => acc + d.w*d.f, 0), raw = ds.reduce((acc,d) => acc + d.w*d.raw, 0);
+    cov = { f, raw, mY: I.yprrAll*f, method: ds.map(d => d.method).join('+'), dims: ds };
   }
   // --- defense (fitted carry-over weight) + #10 DB injuries
   const dw = defWeight(I.oppG), defRaw = I.oppYPA && I.lgYPA ? I.oppYPA/I.lgYPA : 1, defF = 1 + dw*(defRaw - 1);
@@ -501,39 +550,46 @@ function getSplits(name, m){ return mem()[splKey(name, m)] || null; }
 function getInfo(name){
   const mm = mem(), i = mm[infoKey(name)];
   if (i) return i;
-  for (const m of Object.keys(COVERAGES)){ const o = mm[splKey(name, m)]; if (o && o.all) return { all: o.all, routes: '' }; } // v2 back-compat
+  for (const m of Object.keys(COVERAGES)){ const o = mm[splKey(name, m)]; if (o && o.all) return { all: o.all, routes: '' }; } // older-version back-compat
   return null;
 }
 
 // ====================================================================================
 // SINGLE PLAYER VIEW
 // ====================================================================================
-function buildCoverageRows(rates = [], yprrs = [], routes = []){
-  $('covBody').innerHTML = COVERAGES[mode].map((c,i) => `
+function buildCoverageRows(data = {}){
+  const dims = MODES[mode];
+  $('covBody').innerHTML = dims.map(dim => {
+    const d = data[dim] || {};
+    const head = dims.length > 1 ? `<tr><td colspan="5" style="font-weight:700;font-size:.8rem">${DIM_LABEL[dim]} <span class="sub" id="cdw-${dim}"></span></td></tr>` : '';
+    return head + COVERAGES[dim].map((c,i) => `
     <tr><td>${c}</td>
-      <td class="num"><input class="covRate" type="number" step="0.1" min="0" max="100" placeholder="%" value="${esc(rates[i] ?? '')}"></td>
-      <td class="num"><input class="covYprr" type="number" step="0.01" min="0" placeholder="YPRR" value="${esc(yprrs[i] ?? '')}"></td>
-      <td class="num"><input class="covRoutes" type="number" step="1" min="0" placeholder="routes" value="${esc(routes[i] ?? '')}"></td>
-      <td class="num" id="cw${i}">—</td></tr>`).join('');
+      <td class="num"><input class="covRate" data-dim="${dim}" data-i="${i}" type="number" step="0.1" min="0" max="100" placeholder="%" value="${esc((d.rates||[])[i] ?? '')}"></td>
+      <td class="num"><input class="covYprr" data-dim="${dim}" data-i="${i}" type="number" step="0.01" min="0" placeholder="YPRR" value="${esc((d.yprrs||[])[i] ?? '')}"></td>
+      <td class="num"><input class="covRoutes" data-dim="${dim}" data-i="${i}" type="number" step="1" min="0" placeholder="routes" value="${esc((d.routes||[])[i] ?? '')}"></td>
+      <td class="num" id="cw-${dim}-${i}">—</td></tr>`).join('');
+  }).join('');
   document.querySelectorAll('#modeToggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
 }
-const readCov = () => ({
-  rates: [...document.querySelectorAll('.covRate')].map(e => e.value),
-  yprrs: [...document.querySelectorAll('.covYprr')].map(e => e.value),
-  routes: [...document.querySelectorAll('.covRoutes')].map(e => e.value)
-});
+function readCov(){
+  const o = {};
+  MODES[mode].forEach(dim => { const q = cls => [...document.querySelectorAll(`.${cls}[data-dim="${dim}"]`)].map(e => e.value);
+    o[dim] = { rates: q('covRate'), yprrs: q('covYprr'), routes: q('covRoutes') }; });
+  return o;
+}
 function rememberDetail(){
   const c = readCov(), opp = $('opp').value.trim(), wk = $('week').value.trim(), pl = $('player').value.trim();
-  if (opp && c.rates.some(v => v !== '')) memSet(covKey(wk, opp, mode), c.rates);
-  if (pl){
-    if (c.yprrs.some(v => v !== '') || c.routes.some(v => v !== '')) memSet(splKey(pl, mode), { y: c.yprrs, r: c.routes });
-    if ($('yprrAll').value || $('routesTotal').value) memSet(infoKey(pl), { all: $('yprrAll').value, routes: $('routesTotal').value });
-  }
+  Object.entries(c).forEach(([dim, d]) => {
+    if (opp && d.rates.some(v => v !== '')) memSet(covKey(wk, opp, dim), d.rates);
+    if (pl && (d.yprrs.some(v => v !== '') || d.routes.some(v => v !== ''))) memSet(splKey(pl, dim), { y: d.yprrs, r: d.routes });
+  });
+  if (pl && ($('yprrAll').value || $('routesTotal').value)) memSet(infoKey(pl), { all: $('yprrAll').value, routes: $('routesTotal').value });
 }
 function recallDetail(resetInfo){
-  const opp = $('opp').value.trim(), wk = $('week').value.trim(), pl = $('player').value.trim();
-  const rates = getRates(wk, opp, mode), sp = getSplits(pl, mode), info = getInfo(pl);
-  buildCoverageRows(rates || [], sp ? sp.y : [], sp && sp.r ? sp.r : []);
+  const opp = $('opp').value.trim(), wk = $('week').value.trim(), pl = $('player').value.trim(), data = {};
+  MODES[mode].forEach(dim => { const sp = getSplits(pl, dim); data[dim] = { rates: getRates(wk, opp, dim) || [], yprrs: sp ? sp.y : [], routes: sp && sp.r ? sp.r : [] }; });
+  buildCoverageRows(data);
+  const info = getInfo(pl);
   if (info){ set('yprrAll', info.all); set('routesTotal', info.routes); }
   else if (resetInfo){ set('yprrAll', null); set('routesTotal', null); }
 }
@@ -761,7 +817,7 @@ function gatherDetail(){
     attAvg: num('attAvg'), projAtt: num('projAtt'), dbPg: num('dbPg'), oppYPA: num('oppYPA'), lgYPA: num('lgYPA'), oppG: num('oppG'),
     dbOut: dbCounts(DATA && DATA.teams[opp], dbOut), incYA: num('incYA'), qbYA: num('qbYA'),
     wx: { indoor: $('indoor').checked, wind: num('wind'), precip: $('precip').checked },
-    rates: c.rates.map(v => Math.max(0, parseFloat(v) || 0)), yprrs: c.yprrs.map(pnum), routesBy: c.routes.map(pnum),
+    dims: Object.entries(c).map(([dim, d]) => ({ dim, rates: d.rates.map(pnum), yprrs: d.yprrs.map(pnum), routesBy: d.routes.map(pnum) })),
     yprrAll: num('yprrAll'), routesTotal: num('routesTotal'), teamDb: num('teamDb'), adot: num('adot'),
     line: num('line'), overOdds: num('overOdds'), underOdds: num('underOdds') };
 }
@@ -769,10 +825,15 @@ function calc(){
   const s = settings();
   $('seasonWVal').textContent = Math.round(s.ws*100); $('recentWVal').textContent = Math.round(100 - s.ws*100);
   $('rwVal').textContent = Math.round(s.rw*100); $('wLegacyVal').textContent = Math.round(s.wLegacy*100);
-  const I = gatherDetail(), sum = I.rates.reduce((a,b) => a+b, 0), sumEl = $('covSum');
-  if (sum === 0){ sumEl.className = 'sumline bad'; sumEl.textContent = 'Enter the defense coverage rates.'; }
-  else if (Math.abs(sum-100) <= 0.5){ sumEl.className = 'sumline ok'; sumEl.textContent = `Total: ${f1(sum)}% ✓`; }
-  else { sumEl.className = 'sumline warn'; sumEl.textContent = `Total: ${f1(sum)}%. Rates will be scaled to 100%.`; }
+  const I = gatherDetail(), sumEl = $('covSum');
+  sumEl.className = 'sumline';
+  sumEl.innerHTML = I.dims.map(D => {
+    const entered = D.rates.filter(v => v != null);
+    if (!entered.length) return `<span class="bad">${DIM_LABEL[D.dim]}: enter rates</span>`;
+    const tot = fillRates(D.rates).reduce((x,y) => x+y, 0), ok = Math.abs(tot-100) <= 0.5;
+    const auto = D.rates.length === 2 && entered.length === 1 ? ' (other side auto-filled)' : '';
+    return `<span class="${ok ? 'ok' : 'warn'}">${DIM_LABEL[D.dim]}: ${f1(tot)}%${ok ? ' ✓' : ', scaled to 100%'}${auto}</span>`;
+  }).join(' · ');
   const dw = defWeight(I.oppG);
   $('defHint').textContent = `Carry-over weight for a defense with ${I.oppG ?? '?'} games: ${Math.round(dw*100)}% (fitted).`;
   const r = model(I);
@@ -782,7 +843,12 @@ function calc(){
 
 function render(r){
   $('outErrors').innerHTML = (r.errors || []).map(e => `<li>${esc(e)}</li>`).join('');
-  COVERAGES[mode].forEach((_, i) => { const el = $('cw' + i); if (el) el.textContent = r.cov && r.cov.rows[i] ? Math.round(r.cov.rows[i].wt*100) + '%' : '—'; });
+  MODES[mode].forEach(dim => {
+    const d = r.cov && r.cov.dims ? r.cov.dims.find(x => x.dim === dim) : null;
+    COVERAGES[dim].forEach((_, i) => { const el = $(`cw-${dim}-${i}`); if (el) el.textContent = d && d.rows[i] ? Math.round(d.rows[i].wt*100) + '%' : '—'; });
+    const h = $('cdw-' + dim);
+    if (h) h.innerHTML = d && d.league ? `· blend weight <b>${Math.round(d.w*100)}%</b>. This defense's ${DIM_SHARE[dim]} is ${pct(d.share)} vs league ${pct(d.league.mean)} (${sgn(d.z)}${f1(d.z)} SD)` : '';
+  });
   if (r.errors.length){
     ['outYards','outFair'].forEach(i => $(i).textContent = '—'); ['outBreak','kpis','outRec','outFlag','outMethods','covInfo'].forEach(i => $(i).innerHTML = '');
     $('outTitle').textContent = 'Enter inputs to generate a projection'; return;
@@ -793,9 +859,11 @@ function render(r){
   $('outFair').textContent = r.fair != null ? f1(r.fair) : '—';
   $('outMethods').innerHTML = r.m2 != null ? `YPG method <b>${f1(r.m1)}</b> · Route method <b>${f1(r.m2)}</b> · blend ${Math.round((1-r.rw)*100)}/${Math.round(r.rw*100)}`
     : 'YPG method only. Enter total routes (box 2) to add the route method.';
-  const cm = { routes:'shrunk by routes per split', estimated:'routes per split estimated from total routes × league coverage mix', legacy:'fallback weight (no route counts entered)', none:'no splits entered' }[r.cov.method];
+  const mName = { routes:'shrunk by routes per split', estimated:'split routes estimated from total routes', legacy:'fallback weight, no route counts', none:'no splits entered' };
+  const dimTxt = r.cov.dims.map(d => `${DIM_LABEL[d.dim]} ×${f3(d.f)} (${mName[d.method]}${r.cov.dims.length > 1 ? `, ${Math.round(d.w*100)}% of blend` : ''})`).join(' · ');
+  const lgSrc = r.cov.dims.length > 1 && r.cov.dims[0].league ? `<br><span class="sub">League baseline: ${esc(r.cov.dims[0].league.src)}.</span>` : '';
   $('covInfo').innerHTML = (r.rt ? `Route participation <b>${pct(r.rt.rp)}</b> (${I.routesTotal} routes ÷ ${I.teamDb} team dropbacks in his games) → projected <b>${f1(r.rt.projRoutes)}</b> routes on ${f1(r.rt.projDb)} dropbacks.<br>` : '') +
-    `Matchup YPRR <b>${f2(r.cov.mY)}</b> vs overall ${f2(I.yprrAll)} (${cm}).`;
+    `Matchup YPRR <b>${f2(r.cov.mY)}</b> vs overall ${f2(I.yprrAll)}. ${dimTxt}.` + lgSrc;
   const pO = r.pOver;
   $('kpis').innerHTML = `
     <div class="kpi"><div class="l">Model P(Over ${r.line})</div><div class="v">${pO != null ? pct(pO) : '—'}</div><div class="sub">Under ${pO != null ? pct(1-pO) : '—'}</div></div>
@@ -833,8 +901,9 @@ function saveInputs(){
 }
 function loadInputs(){
   const s = store.get(K.inputs) || store.get(K.oldInputs);
-  if (s && COVERAGES[s.mode]) mode = s.mode;
-  buildCoverageRows(s?.cov?.rates, s?.cov?.yprrs, s?.cov?.routes);
+  if (s && MODES[s.mode]) mode = s.mode;
+  const cv = s && s.cov ? (Array.isArray(s.cov.rates) ? { [MODES[mode][0]]: { rates: s.cov.rates, yprrs: s.cov.yprrs, routes: s.cov.routes } } : s.cov) : {};
+  buildCoverageRows(cv);
   if (s?.fields) FIELDS.forEach(id => { if (s.fields[id] != null && s.fields[id] !== '') $(id).value = s.fields[id]; });
   if (s?.checks) CHECKS.forEach(id => $(id).checked = !!s.checks[id]);
   if (s && DATA && s.curId && DATA.players[s.curId] && s.week === DATA.meta.week){
@@ -846,17 +915,18 @@ function loadInputs(){
 // SLATE VIEW (#17)
 // ====================================================================================
 let slRows = [], slRes = {}, slSort = { key:'ev', dir:-1 };
-const twoSplit = () => mode !== 'detailed';
+const inlineDims = () => mode === 'detailed' ? [] : MODES[mode];
 
 function slateInputs(pid){
   const p = DATA.players[pid], t = DATA.teams[p.team] || {}, g = gameFor(p.team), wk = String(DATA.meta.week);
   const home = g ? g.home === p.team : null, opp = g ? (home ? g.away : g.home) : '', ot = DATA.teams[opp];
   const s = settings();
-  const rates = (getRates(wk, opp, mode) || []).map(v => Math.max(0, parseFloat(v) || 0));
-  while (rates.length < COVERAGES[mode].length) rates.push(0);
-  const sp = getSplits(p.name, mode) || {}, info = getInfo(p.name) || {};
-  const n = COVERAGES[mode].length;
-  const yprrs = Array.from({length:n}, (_,i) => pnum((sp.y || [])[i])), routesBy = Array.from({length:n}, (_,i) => pnum((sp.r || [])[i]));
+  const info = getInfo(p.name) || {};
+  const dims = MODES[mode].map(dim => {
+    const n = COVERAGES[dim].length, rr = getRates(wk, opp, dim) || [], sp = getSplits(p.name, dim) || {};
+    const arr = src => Array.from({length:n}, (_,i) => pnum((src || [])[i]));
+    return { dim, rates: arr(rr), yprrs: arr(sp.y), routesBy: arr(sp.r) };
+  });
   const tsr = redistribute(p, t, defaultOut(t, pid), p.ts, p.l4ts, s.ws);
   const am = g ? attModel(t.attPg, g.total, g.spread != null ? (home ? g.spread : -g.spread) : null, t.g) : null;
   const qb = defaultQB(t);
@@ -867,7 +937,7 @@ function slateInputs(pid){
   return { pid, p, opp, g, book, I: { strict:false, mode, set: s, ypg: p.ypg, l4ypg: p.l4ypg, seasonTS: p.ts, l4TS: p.l4ts, projTS: tsr.proj,
     attAvg: t.attPg, projAtt: am ? am.v : null, dbPg: t.dbPg, oppYPA: ot ? ot.oppYA : null, lgYPA: DATA.league.ya, oppG: ot ? ot.g : null,
     dbOut: dbCounts(ot, defaultDbOut(ot)), incYA: qb ? qb.inc.ya : null, qbYA: qb ? qb.starter.ya : null,
-    wx: { indoor: !!w.indoor, wind: w.wind, precip: !!w.precip }, rates, yprrs, routesBy,
+    wx: { indoor: !!w.indoor, wind: w.wind, precip: !!w.precip }, dims,
     yprrAll: pnum(info.all), routesTotal: pnum(info.routes), teamDb: p.teamDb, adot: p.adot,
     line, overOdds: over, underOdds: under } };
 }
@@ -886,31 +956,31 @@ function slateList(){
 }
 function renderSlate(){
   if (!DATA) return;
-  const labels = COVERAGES[mode];
   $('slLineOnly').closest('div').classList.toggle('hidden', lineMode === 'own');
-  $('slMode').textContent = { simple:'Man / Zone', shell:'Single-high / Two-high', detailed:'Cover 0–6 (splits: enter in Single player view)' }[mode];
-  // defenses panel
-  const wk = String(DATA.meta.week), teams = [...teamsThisWeek()].sort();
-  $('defTable').innerHTML = `<thead><tr><th>Defense</th>${labels.map(l => `<th class="num">${esc(l)} %</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>` +
-    teams.map(tm => { const r = getRates(wk, tm, mode) || []; const tot = r.reduce((a,b) => a + (parseFloat(b) || 0), 0);
-      return `<tr><td><b>${esc(tm)}</b></td>${labels.map((_,i) => `<td class="num"><input class="d-rate" data-team="${esc(tm)}" data-i="${i}" type="number" step="0.1" value="${esc(r[i] ?? '')}"></td>`).join('')}
-        <td class="num" id="dtot-${esc(tm)}">${tot ? f1(tot) + '%' : '—'}</td></tr>`; }).join('') + '</tbody>';
+  $('slMode').textContent = MODE_LABEL[mode] + (mode === 'detailed' ? ' (splits: enter in Single player view)' : '');
+  // defenses panel: one column per coverage, grouped by dimension
+  const wk = String(DATA.meta.week), teams = [...teamsThisWeek()].sort(), dims = MODES[mode];
+  $('defTable').innerHTML = `<thead><tr><th>Defense</th>${dims.map(dim => COVERAGES[dim].map((l,i) => `<th class="num${i === 0 ? ' grp' : ''}">${esc(SHORT[dim][i])} %</th>`).join('') + `<th class="num">Total</th>`).join('')}</tr></thead><tbody>` +
+    teams.map(tm => `<tr><td><b>${esc(tm)}</b></td>` + dims.map(dim => { const r = getRates(wk, tm, dim) || [], tot = fillRates(COVERAGES[dim].map((_,i) => pnum(r[i]))).reduce((a,b) => a+b, 0);
+      return COVERAGES[dim].map((_,i) => `<td class="num${i === 0 ? ' grp' : ''}"><input class="d-rate" data-team="${esc(tm)}" data-dim="${dim}" data-i="${i}" type="number" step="0.1" value="${esc(r[i] ?? '')}"></td>`).join('') +
+        `<td class="num" id="dtot-${esc(tm)}-${dim}">${tot ? f1(tot) + '%' : '—'}</td>`; }).join('') + '</tr>').join('') + '</tbody>';
+  $('defCard').querySelector('summary').textContent = `Defense coverage rates (enter once per defense${dims.length > 1 || mode !== 'detailed' ? '; one side of each pair is enough' : ''})`;
   // players table
   slRows = slateList();
-  const two = twoSplit(), own = lineMode === 'own';
-  const ftnCols = two ? `<th class="num grp">YPRR</th><th class="num">${esc(labels[0].split(' ')[0])}</th><th class="num">${esc(labels[1].split(' ')[0])}</th><th class="num">Routes</th><th class="num">R ${esc(labels[0].split(' ')[0])}</th><th class="num">R ${esc(labels[1].split(' ')[0])}</th>`
-    : `<th class="num grp">YPRR</th><th class="num">Routes</th>`;
+  const idims = inlineDims(), own = lineMode === 'own';
+  const ftnCols = `<th class="num grp">YPRR</th>` + idims.map(dim => SHORT[dim].map(l => `<th class="num">${esc(l)}</th>`).join('')).join('') +
+    `<th class="num">Routes</th>` + idims.map(dim => SHORT[dim].map(l => `<th class="num">R ${esc(l)}</th>`).join('')).join('');
   const lineCols = own ? `<th class="num grp">Line</th><th class="num">Over</th><th class="num">Under</th>` : `<th class="grp">Book</th><th class="num">Line</th><th class="num">Odds O/U</th>`;
   const sh = (k, l) => `<th class="num sort" data-k="${k}">${l}${slSort.key === k ? (slSort.dir < 0 ? ' ▾' : ' ▴') : ''}</th>`;
   $('slateTable').innerHTML = `<thead><tr><th class="sort" data-k="name">Player</th><th>Opp</th>${ftnCols}${lineCols}
     <th class="grp num sort" data-k="mean">Mean${slSort.key==='mean'?(slSort.dir<0?' ▾':' ▴'):''}</th>${sh('fair','Fair')}${sh('p','P(Over)')}<th>Side</th>${sh('ev','EV/$100')}<th>FTN</th><th></th></tr></thead><tbody>` +
     slRows.map(pid => {
-      const p = DATA.players[pid], sp = getSplits(p.name, mode) || {}, info = getInfo(p.name) || {}, g = gameFor(p.team);
+      const p = DATA.players[pid], info = getInfo(p.name) || {}, g = gameFor(p.team);
       const opp = g ? (g.home === p.team ? g.away : g.home) : '';
-      const inp = (cls, v, step) => `<input class="${cls}" data-pid="${esc(pid)}" type="number" step="${step}" value="${esc(v ?? '')}">`;
-      const ftn = two ? `<td class="num grp">${inp('s-all', info.all, 0.01)}</td><td class="num">${inp('s-y0', (sp.y||[])[0], 0.01)}</td><td class="num">${inp('s-y1', (sp.y||[])[1], 0.01)}</td>
-          <td class="num">${inp('s-rt', info.routes, 1)}</td><td class="num">${inp('s-r0', (sp.r||[])[0], 1)}</td><td class="num">${inp('s-r1', (sp.r||[])[1], 1)}</td>`
-        : `<td class="num grp">${inp('s-all', info.all, 0.01)}</td><td class="num">${inp('s-rt', info.routes, 1)}</td>`;
+      const inp = (cls, v, step, extra = '') => `<input class="${cls}" data-pid="${esc(pid)}" ${extra} type="number" step="${step}" value="${esc(v ?? '')}">`;
+      const splitCells = kind => idims.map(dim => { const sp = getSplits(p.name, dim) || {}, src = kind === 'y' ? sp.y : sp.r;
+        return COVERAGES[dim].map((_,i) => `<td class="num">${inp('s-split', (src || [])[i], kind === 'y' ? 0.01 : 1, `data-dim="${dim}" data-i="${i}" data-kind="${kind}"`)}</td>`).join(''); }).join('');
+      const ftn = `<td class="num grp">${inp('s-all', info.all, 0.01)}</td>${splitCells('y')}<td class="num">${inp('s-rt', info.routes, 1)}</td>${splitCells('r')}`;
       let lc;
       if (own){ const o = mem()[ownKey(String(DATA.meta.week), p.name)] || {}; lc = `<td class="num grp">${inp('s-line', o.line, 0.5)}</td><td class="num">${inp('s-over', o.over, 1)}</td><td class="num">${inp('s-under', o.under, 1)}</td>`; }
       else lc = `<td class="grp" id="sb-${esc(pid)}"></td><td class="num" id="sl-${esc(pid)}"></td><td class="num" id="so-${esc(pid)}"></td>`;
@@ -954,20 +1024,20 @@ async function slateWeather(){
 function slateInput(t){
   const pid = t.dataset.pid, p = pid && DATA.players[pid];
   if (t.classList.contains('d-rate')){
-    const tm = t.dataset.team, wk = String(DATA.meta.week);
-    const r = [...document.querySelectorAll(`.d-rate[data-team="${tm}"]`)].map(e => e.value);
-    memSet(covKey(wk, tm, mode), r.some(v => v !== '') ? r : null);
-    const tot = r.reduce((a,b) => a + (parseFloat(b) || 0), 0); $('dtot-' + tm).textContent = tot ? f1(tot) + '%' : '—';
+    const tm = t.dataset.team, dim = t.dataset.dim, wk = String(DATA.meta.week);
+    const r = [...document.querySelectorAll(`.d-rate[data-team="${tm}"][data-dim="${dim}"]`)].map(e => e.value);
+    memSet(covKey(wk, tm, dim), r.some(v => v !== '') ? r : null);
+    const tot = fillRates(r.map(pnum)).reduce((a,b) => a+b, 0); $(`dtot-${tm}-${dim}`).textContent = tot ? f1(tot) + '%' : '—';
     slRows.filter(id => { const g = gameFor(DATA.players[id].team); return g && (g.home === tm || g.away === tm) && DATA.players[id].team !== tm; }).forEach(computeRow);
     return;
   }
   if (!p) return;
   const val = cls => { const el = document.querySelector(`.${cls}[data-pid="${pid}"]`); return el ? el.value : ''; };
   if (t.classList.contains('s-all') || t.classList.contains('s-rt')) memSet(infoKey(p.name), { all: val('s-all'), routes: val('s-rt') });
-  if (/^s-(y|r)[01]$/.test(t.className)){
-    const old = getSplits(p.name, mode) || { y: [], r: [] }, y = [...(old.y || [])], r = [...(old.r || [])];
-    y[0] = val('s-y0'); y[1] = val('s-y1'); r[0] = val('s-r0'); r[1] = val('s-r1');
-    memSet(splKey(p.name, mode), { y, r });
+  if (t.classList.contains('s-split')){
+    const dim = t.dataset.dim, old = getSplits(p.name, dim) || { y: [], r: [] }, y = [...(old.y || [])], r = [...(old.r || [])];
+    document.querySelectorAll(`.s-split[data-pid="${pid}"][data-dim="${dim}"]`).forEach(el => { (el.dataset.kind === 'y' ? y : r)[+el.dataset.i] = el.value; });
+    memSet(splKey(p.name, dim), { y, r });
   }
   if (/^s-(line|over|under)$/.test(t.className)){
     const k = ownKey(String(DATA.meta.week), p.name), o = mem()[k] || {};
