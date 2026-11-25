@@ -1,49 +1,86 @@
-# Receiving Yards Projection Model (WR/TE)
+# Receiving Yards Projection Model (WR/TE), v2
 
-A single-page web app that projects a WR/TE's receiving yards from inputs you enter yourself. It needs no paid data, no server and no build step: one `index.html` file.
+A static web app (GitHub Pages) plus a free scheduled data job (GitHub Actions). You pick a player, and everything except your FTN coverage data fills in automatically.
 
-## Formula
+## What's automated
 
-```
-Projection = Season YPG
-           × (Projected target share ÷ Season target share)
-           × (Projected team pass attempts ÷ Season team pass attempts)      [optional]
-           × [1 + w × (Matchup YPRR ÷ Overall YPRR − 1)]
-           × [1 + w × (Opp yards/attempt allowed ÷ League yards/attempt − 1)] [optional]
-```
-
-- **Coverage views (pick one per projection):** Man/Zone, Single-high/Two-high, or Cover 0–6. Don't combine views, because they overlap and would double count.
-- **Matchup YPRR** = Σ (defense coverage rate × player YPRR vs. that coverage). Coverage rates are scaled to 100%. A blank coverage row uses the player's overall YPRR.
-- **w** is the *Matchup confidence* slider (default 50%). It shrinks the matchup effects toward neutral, because YPRR splits come from small samples.
-
-## Inputs and free sources
-
-| Input | Required? | Free source |
+| Input | Source | Refresh |
 |---|---|---|
-| Defense coverage rates (man/zone or single/two-high) | Yes | FTN Stats IQ (backup: Sharp Football Analysis → NFL Coverage Schemes) |
-| Player YPRR vs. each coverage | Yes | FTN Stats IQ |
-| Player overall YPRR | Yes | FTN Stats IQ (backup: SumerSports) |
-| Season receiving YPG | Yes | Pro-Football-Reference player page |
-| Season target share | Yes* | Player targets ÷ team pass attempts (both on Pro-Football-Reference) |
-| Projected target share | Yes* | Your judgment (injuries, returns, depth chart) |
-| Team pass attempts (season / projected) | Optional | Pro-Football-Reference team page; adjust the projection for the spread and total |
-| Opp. Y/A allowed and league Y/A | Optional | Pro-Football-Reference → Team Defense → Passing (the league average row) |
-| Sportsbook line | Yes | Any sportsbook |
+| Season and last-4 yards per game, target shares | nflverse | Tue / Thu / Sat / Sun |
+| Teammate target shares and injury status (#13) | nflverse | Tue / Thu / Sat / Sun |
+| Team pass attempts, opponent and league yards per attempt | nflverse | Tue / Thu / Sat / Sun |
+| Spread, total, and projected pass attempts (#11) | nflverse schedules + fitted model | Tue / Thu / Sat / Sun |
+| QB list and Y/A, with starter selection (#7) | nflverse rosters + injuries | Tue / Thu / Sat / Sun |
+| Kickoff wind and precipitation (#8) | Open-Meteo, fetched live in your browser | Each time you load a player |
+| Sportsbook line and over/under odds, by book | The Odds API (free key) | Thu / Sat / Sun |
+| **Coverage rates, YPRR splits, overall YPRR** | **You, from FTN Stats IQ** | Manual. Remembered per opponent and player for the week. |
 
-\* Leave both target-share fields blank to skip the target-share adjustment.
+## Model
 
-## Deploy to GitHub Pages (about 5 minutes)
+```
+Mean = Baseline YPG × TS factor × Volume × Coverage × Defense × QB × Weather
 
-1. Go to github.com and click **New repository**. Name it, for example, `wr-yards-model`, set it to **Public**, and click **Create**.
-2. On the repo page, click **Add file → Upload files**, drag in `index.html` and `README.md`, then click **Commit changes**.
-3. Go to **Settings → Pages**. Under *Build and deployment*, set Source to **Deploy from a branch**, Branch to **main**, and folder to **/ (root)**, then click **Save**.
-4. Wait 1–2 minutes and refresh. Your site is live at `https://<your-username>.github.io/wr-yards-model/`.
-5. To update the site later, edit `index.html` on GitHub (pencil icon) or upload a new version. Pages redeploys automatically.
+Baseline YPG  = w × season YPG + (1−w) × last-4 YPG                   (#4, default w = 60%)
+TS factor     = projected TS ÷ blended TS                             (#13 sets projected TS)
+Volume        = projected attempts ÷ team average                     (#11)
+Coverage      = 1 + c × (matchup YPRR ÷ overall YPRR − 1)             (c = matchup confidence)
+Defense       = 1 + c × (opp Y/A allowed ÷ league Y/A − 1)
+QB            = this game's QB Y/A ÷ usual starter Y/A                (#7)
+Weather       = fitted wind factor (or indoor factor) × rain/snow factor   (#8)
 
-Saved inputs and the projection log are stored in your browser's localStorage. They stay on that device and browser, so use **Export CSV** to back them up.
+Fair line     = Mean × historical median ratio                        (#1)
+P(Over)       = share of historical outcomes above (line ÷ mean)      (#1)
+EV per $100   = P × profit − (1−P) × 100, at the book's odds          (#2)
+Edge flag     = |fair line − line| ÷ line > 20%                       (#6)
+```
 
-## Calibrating
+### What the 2018–2025 fits found (refit every run)
+- **Fair line sits below the mean:** about 20% below for players averaging under 45 yards, 12% for 45–70, and 7% for 70+. This is why comparing a mean projection to a line leans over.
+- **Pass attempts follow the game total and the team's own average, not the spread.** The spread coefficient is about 0 (big favorites average 33.5 attempts, big underdogs 32.9). The weight on the team's average grows from 0.29 (3–5 games played) to 0.63 (10+ games).
+- **Wind (passing yards per attempt vs. the team's own norm):** 0–9 mph ×1.00, 10–14 ×0.97, 15–19 ×0.94, 20+ ×0.93. Indoors ×1.02.
+- **Backup-QB prior:** 6.36 Y/A, used to stabilize QBs with small samples.
+- **Rain/snow factor (0.95)** is an assumption, because free data has no historical precipitation. Tune it with your log.
 
-1. Save every projection to the log, then enter actual yards after the game.
-2. Watch the **mean absolute error** and **bias** figures. If bias stays positive (the model runs low) over 20+ games, the baseline is too conservative.
-3. Tune the **matchup confidence** slider. If raising it lowers your error over a full sample, the coverage splits are carrying real signal.
+## Repo layout
+
+```
+index.html                         the app
+data/data.json                     generated by the workflow (don't edit)
+scripts/build_data.py              data builder
+requirements.txt                   Python packages for the builder
+.github/workflows/update-data.yml  schedule (Tue/Thu/Sat/Sun) + manual "Run workflow" button
+```
+
+## Setup (one time, about 15 minutes)
+
+1. **Get a free Odds API key.** Sign up for the free Starter plan at the-odds-api.com. The key arrives by email. The free plan has 500 credits/month, and each props pull costs about 1 credit per game (about 200/month on this schedule).
+2. **Add the key to GitHub.** In your repo, go to **Settings → Secrets and variables → Actions → New repository secret**. Name it `ODDS_API_KEY` and paste the key as the value. This keeps the key private; it never appears in the public page.
+3. **Allow the workflow to save data.** Go to **Settings → Actions → General → Workflow permissions**, select **Read and write permissions**, and click **Save**.
+4. **Upload the files.** Unzip the download. On the repo's main page, click **Add file → Upload files** and drag in everything *inside* the unzipped folder (`index.html`, `README.md`, `requirements.txt`, and the `data`, `scripts` and `.github` folders), then click **Commit changes**.
+   - On a Mac, `.github` is hidden. Press **Cmd + Shift + .** in Finder to show it.
+   - If the `.github` folder won't upload, click **Add file → Create new file**, type `.github/workflows/update-data.yml` as the name, paste the file's contents, and commit.
+5. **Run the data job once.** Open the **Actions** tab (click "I understand… enable workflows" if prompted), choose **Update model data → Run workflow → Run workflow**. It takes about 3–5 minutes. A green check means `data/data.json` was updated.
+6. **Open your site** and hard-refresh (Ctrl/Cmd + Shift + R). The top bar should show **"Data: 2026 Week N · stats updated …"**.
+
+After that, it updates itself on schedule. To pull fresh props before kickoff, run it manually again (step 5).
+
+## Weekly workflow
+
+1. **Thursday onward:** open the site and pick a player in box 0.
+2. **Check the auto-filled values:** the injury pre-checks in the teammates table, the starting QB, and the forecast.
+3. **Enter your FTN Stats IQ numbers:** defense coverage rates, the player's YPRR splits, and overall YPRR.
+4. **Read the output:** P(Over) vs. the market's, the EV for each side, and whether the edge was flagged.
+5. **Save it to the log.** Enter the actual yards after the game. The log grades the model's side at 1 unit per bet.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "No data file found: manual mode" | Run the workflow (setup step 5), then hard-refresh the site. |
+| Workflow fails at "Commit updated data" with a 403 error | Redo setup step 3 (Read and write permissions). |
+| "No props posted" for every player | Props usually appear 1–3 days before kickoff. Run the workflow manually closer to the game. Also check that the `ODDS_API_KEY` secret exists. |
+| Props stopped updating late in the month | You've used the 500 free credits. They reset on the 1st. |
+| Scheduled runs stopped (e.g. in the offseason) | GitHub pauses schedules in inactive public repos. Re-enable the workflow in the Actions tab. |
+| A value looks wrong | Every field is editable, and your edit overrides the auto value. |
+
+Data: nflverse (CC-BY 4.0), The Odds API, Open-Meteo (CC-BY 4.0).

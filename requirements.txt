@@ -1,0 +1,4 @@
+nflreadpy>=0.1
+polars
+numpy
+requests

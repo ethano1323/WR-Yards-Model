@@ -7,410 +7,768 @@
 <style>
   :root{
     --bg:#f5f6f8; --card:#ffffff; --text:#1b1f24; --muted:#5f6b7a; --border:#dde2e8;
-    --accent:#1f6feb; --good:#1a7f37; --bad:#cf222e; --warn:#9a6700; --input:#ffffff;
+    --accent:#1f6feb; --good:#1a7f37; --bad:#cf222e; --warn:#9a6700; --input:#ffffff; --warnbg:#fff8e1;
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#0f1216; --card:#171b21; --text:#e6e9ee; --muted:#9aa4b2; --border:#2a313b;
-           --accent:#4c8dff; --good:#3fb950; --bad:#f85149; --warn:#d29922; --input:#0f1216; }
+           --accent:#4c8dff; --good:#3fb950; --bad:#f85149; --warn:#d29922; --input:#0f1216; --warnbg:#2b2210; }
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
        background:var(--bg);color:var(--text);line-height:1.45}
-  header{padding:20px 16px 4px;max-width:1100px;margin:0 auto}
+  header{padding:20px 16px 4px;max-width:1150px;margin:0 auto}
   header h1{margin:0;font-size:1.5rem}
   header p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
-  main{max-width:1100px;margin:0 auto;padding:12px 16px 40px;display:grid;gap:14px;
-       grid-template-columns:1fr}
-  @media (min-width:900px){ main{grid-template-columns:1.15fr .85fr} .full{grid-column:1/-1} }
+  .status{max-width:1150px;margin:8px auto 0;padding:0 16px;font-size:.8rem;color:var(--muted)}
+  .status b{color:var(--text)}
+  main{max-width:1150px;margin:0 auto;padding:12px 16px 40px;display:grid;gap:14px;grid-template-columns:1fr}
+  @media (min-width:950px){ main{grid-template-columns:1.2fr .8fr} .full{grid-column:1/-1} }
+  .col{display:grid;gap:14px;align-content:start}
   .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
   .card h2{margin:0 0 10px;font-size:1.05rem}
-  .card h2 .step{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--accent);
-       color:#fff;font-size:.8rem;text-align:center;line-height:22px;margin-right:6px}
-  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-  label{display:block;font-size:.82rem;font-weight:600;margin-bottom:3px}
+  .step{display:inline-block;min-width:22px;height:22px;border-radius:11px;background:var(--accent);
+       color:#fff;font-size:.8rem;text-align:center;line-height:22px;margin-right:6px;padding:0 6px}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+  label{display:block;font-size:.8rem;font-weight:600;margin-bottom:3px}
   input,select{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;
        background:var(--input);color:var(--text);font-size:.95rem}
-  input:focus{outline:2px solid var(--accent);outline-offset:-1px}
-  .hint{display:block;color:var(--muted);font-size:.74rem;margin-top:2px}
-  table{width:100%;border-collapse:collapse;font-size:.9rem}
-  th,td{padding:6px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
-  th{font-size:.76rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  input[type=checkbox]{width:auto;margin:0 6px 0 0;vertical-align:middle}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .hint{display:block;color:var(--muted);font-size:.73rem;margin-top:2px}
+  .auto{font-size:.65rem;font-weight:700;color:var(--accent);margin-left:4px;text-transform:uppercase}
+  table{width:100%;border-collapse:collapse;font-size:.88rem}
+  th,td{padding:5px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   .toggle{display:flex;gap:6px;margin-bottom:4px;flex-wrap:wrap}
   .toggle button{flex:1;min-width:120px}
   button{padding:7px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);
        color:var(--text);cursor:pointer;font-size:.88rem}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  button.active{background:var(--accent);border-color:var(--accent);color:#fff}
-  button:hover{filter:brightness(1.05)}
+  button.primary,button.active{background:var(--accent);border-color:var(--accent);color:#fff}
   .sumline{font-size:.82rem;margin-top:6px}
-  .ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  .ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)} .muted{color:var(--muted)}
   details.card summary{cursor:pointer;font-weight:700;font-size:1.05rem}
   details.card[open] summary{margin-bottom:10px}
-  .output{position:sticky;top:12px;align-self:start}
-  .big{font-size:2.6rem;font-weight:800;margin:2px 0 0;font-variant-numeric:tabular-nums}
-  .sub{color:var(--muted);font-size:.85rem}
+  .output{position:sticky;top:12px}
+  .big{font-size:2.5rem;font-weight:800;margin:0;font-variant-numeric:tabular-nums;line-height:1.1}
+  .sub{color:var(--muted);font-size:.83rem}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .kpi{border:1px solid var(--border);border-radius:8px;padding:8px}
+  .kpi .v{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .kpi .l{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
   .errors{color:var(--bad);font-size:.85rem;margin:6px 0 0;padding-left:18px}
-  .edge{margin-top:10px;padding:10px;border-radius:8px;border:1px solid var(--border);font-size:.92rem}
+  .banner{margin-top:10px;padding:9px 11px;border-radius:8px;font-size:.86rem;border:1px solid var(--border)}
+  .banner.flag{background:var(--warnbg);border-color:var(--warn)}
+  .rec{margin-top:10px;padding:10px;border-radius:8px;border:2px solid var(--border);font-size:.95rem}
+  .rec.pos{border-color:var(--good)}
   .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   .log-wrap{overflow-x:auto}
-  .log-wrap input{width:80px;padding:4px 6px}
-  .stats{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0;font-size:.88rem}
+  .log-wrap input{width:70px;padding:4px 6px}
+  .stats{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0;font-size:.86rem}
   .stats b{font-variant-numeric:tabular-nums}
-  .range-row{display:flex;align-items:center;gap:10px}
-  .range-row input{flex:1}
-  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;color:var(--muted);
+  .badge{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 6px;border-radius:9px;margin-left:4px}
+  .b-Out,.b-Doubtful{background:var(--bad);color:#fff} .b-Questionable{background:var(--warn);color:#fff}
+  .info{font-size:.82rem;color:var(--muted);margin-top:8px}
+  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.74rem;color:var(--muted);
        background:var(--bg);padding:8px;border-radius:6px;margin-top:10px;white-space:pre-wrap}
+  .hidden{display:none}
 </style>
 </head>
 <body>
 <header>
   <h1>Receiving Yards Projection Model</h1>
-  <p>WR / TE · coverage-adjusted · 100% user-input (no paid data)</p>
+  <p>WR / TE · coverage-adjusted · auto-filled from free data (nflverse, The Odds API, Open-Meteo)</p>
 </header>
+<div class="status" id="dataStatus">Loading data…</div>
 
 <main>
-  <!-- LEFT: INPUTS -->
-  <div style="display:grid;gap:14px">
+<div class="col">
 
-    <section class="card">
-      <h2><span class="step">1</span>Matchup</h2>
-      <div class="grid">
-        <div><label for="player">Player</label><input id="player" type="text" placeholder="e.g. Puka Nacua"></div>
-        <div><label for="opp">Opponent</label><input id="opp" type="text" placeholder="e.g. SEA"></div>
-        <div><label for="week">Week</label><input id="week" type="text" placeholder="e.g. 13"></div>
-      </div>
-    </section>
+  <!-- 0. PLAYER PICKER -->
+  <section class="card" id="pickCard">
+    <h2><span class="step">0</span>Load a player</h2>
+    <input id="pick" list="pickList" placeholder="Start typing a WR/TE on this week's slate…" autocomplete="off">
+    <datalist id="pickList"></datalist>
+    <span class="hint">Fills every field except your FTN coverage data. Every field stays editable.</span>
+    <div class="info" id="gameInfo"></div>
+  </section>
 
-    <section class="card">
-      <h2><span class="step">2</span>Defense coverage &amp; player YPRR</h2>
-      <div class="toggle">
-        <button type="button" data-mode="simple" class="active">Man / Zone</button>
-        <button type="button" data-mode="shell">Single-high / Two-high</button>
-        <button type="button" data-mode="detailed">Cover 0–6</button>
-      </div>
-      <span class="hint" style="margin-bottom:10px">Use one view per projection. Man/zone and single/two-high overlap (most man coverage is single-high), so combining them would double count.</span>
-      <table>
-        <thead><tr><th>Coverage</th><th class="num">Defense rate (%)</th><th class="num">Player YPRR vs.</th></tr></thead>
-        <tbody id="covBody"></tbody>
-      </table>
-      <div id="covSum" class="sumline"></div>
-      <div class="grid" style="margin-top:10px">
-        <div>
-          <label for="yprrAll">Player overall YPRR (season)</label>
-          <input id="yprrAll" type="number" step="0.01" min="0" placeholder="e.g. 2.10">
-          <span class="hint">Blank coverage rows fall back to this value.</span>
-        </div>
-      </div>
-    </section>
+  <!-- 1. MATCHUP -->
+  <section class="card">
+    <h2><span class="step">1</span>Matchup</h2>
+    <div class="grid">
+      <div><label for="player">Player</label><input id="player" type="text" placeholder="e.g. Puka Nacua"></div>
+      <div><label for="team">Team</label><input id="team" type="text" placeholder="e.g. LA"></div>
+      <div><label for="opp">Opponent</label><input id="opp" type="text" placeholder="e.g. SEA"></div>
+      <div><label for="week">Week</label><input id="week" type="text" placeholder="e.g. 13"></div>
+    </div>
+  </section>
 
-    <section class="card">
-      <h2><span class="step">3</span>Baseline, target share &amp; line</h2>
-      <div class="grid">
-        <div>
-          <label for="ypg">Season receiving yards / game</label>
-          <input id="ypg" type="number" step="0.1" min="0" placeholder="e.g. 78.4">
-          <span class="hint">Use only games where his role was normal.</span>
-        </div>
-        <div>
-          <label for="seasonTS">Season target share (%)</label>
-          <input id="seasonTS" type="number" step="0.1" min="0" max="100" placeholder="e.g. 24.5">
-        </div>
-        <div>
-          <label for="projTS">Projected target share this game (%)</label>
-          <input id="projTS" type="number" step="0.1" min="0" max="100" placeholder="e.g. 28.0">
-          <span class="hint">Raise it when a teammate is out, lower it when one returns.</span>
-        </div>
-        <div>
-          <label for="line">Sportsbook yardage line</label>
-          <input id="line" type="number" step="0.5" min="0" placeholder="e.g. 72.5">
-        </div>
-      </div>
-    </section>
-
-    <details class="card" id="optBox">
-      <summary>4. Optional adjustments (recommended)</summary>
-      <div class="grid">
-        <div>
-          <label for="attAvg">Team pass attempts / game (season)</label>
-          <input id="attAvg" type="number" step="0.1" min="0" placeholder="e.g. 34.2">
-        </div>
-        <div>
-          <label for="attProj">Projected team pass attempts (this game)</label>
-          <input id="attProj" type="number" step="0.1" min="0" placeholder="e.g. 37">
-          <span class="hint">Push this up if they're underdogs or the total is high, down if they're big favorites.</span>
-        </div>
-        <div>
-          <label for="oppYPA">Opp. yards allowed / pass attempt</label>
-          <input id="oppYPA" type="number" step="0.1" min="0" placeholder="e.g. 7.1">
-        </div>
-        <div>
-          <label for="lgYPA">League avg yards / pass attempt</label>
-          <input id="lgYPA" type="number" step="0.1" min="0" placeholder="e.g. 6.6">
-        </div>
-      </div>
-      <div style="margin-top:12px">
-        <label for="weight">Matchup confidence: <span id="weightVal">50</span>%</label>
-        <div class="range-row"><input id="weight" type="range" min="0" max="100" step="5" value="50"></div>
-        <span class="hint">How much of the coverage and defense edge to trust. Coverage splits are small samples, so 50% is a safe start. Use 30–40% before about week 6 and 60–70% once the player has 100+ routes against each coverage.</span>
-      </div>
-    </details>
-  </div>
-
-  <!-- RIGHT: OUTPUT -->
-  <section class="card output">
-    <h2>Projection</h2>
-    <div class="sub" id="outTitle">Enter inputs to generate a projection</div>
-    <div class="big" id="outYards">—</div>
-    <div class="sub">projected receiving yards</div>
-    <ul class="errors" id="outErrors"></ul>
-    <table style="margin-top:12px">
-      <thead><tr><th>Component</th><th class="num">Input</th><th class="num">Factor</th></tr></thead>
-      <tbody id="outBreak"></tbody>
+  <!-- 2. COVERAGE -->
+  <section class="card">
+    <h2><span class="step">2</span>Defense coverage &amp; player YPRR <span class="muted" style="font-weight:400;font-size:.8rem">(FTN Stats IQ)</span></h2>
+    <div class="toggle">
+      <button type="button" data-mode="simple" class="active">Man / Zone</button>
+      <button type="button" data-mode="shell">Single-high / Two-high</button>
+      <button type="button" data-mode="detailed">Cover 0–6</button>
+    </div>
+    <span class="hint" style="margin-bottom:10px">Use one view per projection. The views overlap (most man coverage is single-high), so combining them would double count. Coverage rates are remembered per opponent each week, and YPRR splits per player.</span>
+    <table>
+      <thead><tr><th>Coverage</th><th class="num">Defense rate (%)</th><th class="num">Player YPRR vs.</th></tr></thead>
+      <tbody id="covBody"></tbody>
     </table>
-    <div id="outEdge"></div>
-    <div class="row-actions">
-      <button class="primary" type="button" id="saveBtn">Save to log</button>
-      <button type="button" id="resetBtn">Reset inputs</button>
+    <div id="covSum" class="sumline"></div>
+    <div class="grid" style="margin-top:10px">
+      <div>
+        <label for="yprrAll">Player overall YPRR (season)</label>
+        <input id="yprrAll" type="number" step="0.01" min="0" placeholder="e.g. 2.10">
+        <span class="hint">Blank coverage rows use this value.</span>
+      </div>
     </div>
-    <div class="formula">Projection = Season YPG
-  × (Proj TS ÷ Season TS)
-  × (Proj pass att ÷ Season pass att)
-  × [1 + w × (Matchup YPRR ÷ Overall YPRR − 1)]
-  × [1 + w × (Opp Y/A ÷ League Y/A − 1)]</div>
   </section>
 
-  <!-- LOG -->
-  <section class="card full">
-    <h2>Projection log &amp; accuracy tracker</h2>
-    <div class="sub">Enter actual yards after each game to track the model's error over time. The log is saved in this browser only.</div>
-    <div class="stats" id="logStats"></div>
-    <div class="log-wrap">
-      <table>
-        <thead><tr><th>Date</th><th>Player</th><th>Opp</th><th>Wk</th><th class="num">Proj</th><th class="num">Line</th><th class="num">Actual</th><th class="num">Error</th><th></th></tr></thead>
-        <tbody id="logBody"></tbody>
-      </table>
+  <!-- 3. BASELINE & TARGET SHARE -->
+  <section class="card">
+    <h2><span class="step">3</span>Baseline, recent form &amp; target share</h2>
+    <div class="grid">
+      <div><label for="ypg">Season rec. yards / game<span class="auto">auto</span></label><input id="ypg" type="number" step="0.1" min="0"></div>
+      <div><label for="l4ypg">Last-4 rec. yards / game<span class="auto">auto</span></label><input id="l4ypg" type="number" step="0.1" min="0"></div>
+      <div><label for="seasonTS">Season target share %<span class="auto">auto</span></label><input id="seasonTS" type="number" step="0.1" min="0" max="100"></div>
+      <div><label for="l4TS">Last-4 target share %<span class="auto">auto</span></label><input id="l4TS" type="number" step="0.1" min="0" max="100"></div>
     </div>
-    <div class="row-actions">
-      <button type="button" id="exportBtn">Export CSV</button>
-      <button type="button" id="clearBtn">Clear log</button>
+    <div style="margin-top:10px">
+      <label for="seasonW">Season vs. last-4 weight: <span id="seasonWVal">60</span>% season / <span id="recentWVal">40</span>% recent</label>
+      <input id="seasonW" type="range" min="0" max="100" step="5" value="60">
+    </div>
+    <div id="mateBox" class="hidden" style="margin-top:12px">
+      <label>Teammates: check anyone who is OUT. Their targets are redistributed proportionally.</label>
+      <span class="hint" style="margin-bottom:6px">Players listed Out or Doubtful are pre-checked. Proportional redistribution can overstate an alpha's gain when a big share is vacated, so trim it if it looks too high.</span>
+      <table><thead><tr><th>Out</th><th>Player</th><th class="num">Season</th><th class="num">L4</th><th class="num">Blend</th></tr></thead>
+      <tbody id="mateBody"></tbody></table>
+      <div class="info" id="mateInfo"></div>
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div><label for="projTS">Projected target share this game %<span class="auto">auto</span></label>
+        <input id="projTS" type="number" step="0.1" min="0" max="100">
+        <span class="hint">Calculated from the teammates you check. Type a value to override it.</span></div>
     </div>
   </section>
+
+  <!-- 4. VOLUME & DEFENSE -->
+  <section class="card">
+    <h2><span class="step">4</span>Pass volume &amp; defense</h2>
+    <div class="grid">
+      <div><label for="attAvg">Team pass att / game<span class="auto">auto</span></label><input id="attAvg" type="number" step="0.1" min="0"></div>
+      <div><label for="teamG">Team games played<span class="auto">auto</span></label><input id="teamG" type="number" step="1" min="0"></div>
+      <div><label for="total">Game total (O/U)<span class="auto">auto</span></label><input id="total" type="number" step="0.5" min="0"></div>
+      <div><label for="spread">Team spread (+ = favored)<span class="auto">auto</span></label><input id="spread" type="number" step="0.5"></div>
+      <div><label for="projAtt">Projected pass attempts<span class="auto">auto</span></label><input id="projAtt" type="number" step="0.1" min="0">
+        <span class="hint" id="attHint">Calculated from the team's average and the game total.</span></div>
+      <div><label for="oppYPA">Opp. yards allowed / att<span class="auto">auto</span></label><input id="oppYPA" type="number" step="0.01" min="0"></div>
+      <div><label for="lgYPA">League avg yards / att<span class="auto">auto</span></label><input id="lgYPA" type="number" step="0.01" min="0"></div>
+    </div>
+  </section>
+
+  <!-- 5. QB -->
+  <section class="card">
+    <h2><span class="step">5</span>Quarterback</h2>
+    <div class="grid">
+      <div id="qbSelWrap" class="hidden"><label for="qbSel">Expected starter</label><select id="qbSel"></select></div>
+      <div><label for="incYA">Usual starter Y/A<span class="auto">auto</span></label><input id="incYA" type="number" step="0.01" min="0"></div>
+      <div><label for="qbYA">This game's QB Y/A<span class="auto">auto</span></label><input id="qbYA" type="number" step="0.01" min="0"></div>
+    </div>
+    <span class="hint">Y/A covers the last 3 seasons, blended with 200 attempts at the historical backup-QB rate so small samples don't swing it. Leave both blank to skip this factor.</span>
+  </section>
+
+  <!-- 6. WEATHER -->
+  <section class="card">
+    <h2><span class="step">6</span>Weather</h2>
+    <div class="info" id="wxInfo" style="margin:0 0 8px">Load a player to pull the kickoff forecast.</div>
+    <div class="grid">
+      <div><label><input id="indoor" type="checkbox">Indoors (dome / roof closed)</label></div>
+      <div><label for="wind">Wind at kickoff (mph)<span class="auto">auto</span></label><input id="wind" type="number" step="1" min="0"></div>
+      <div><label><input id="precip" type="checkbox">Heavy rain / snow expected</label></div>
+    </div>
+  </section>
+
+  <!-- 7. LINE & ODDS -->
+  <section class="card">
+    <h2><span class="step">7</span>Sportsbook line &amp; odds</h2>
+    <div class="grid">
+      <div id="bookWrap" class="hidden"><label for="bookSel">Sportsbook</label><select id="bookSel"></select></div>
+      <div><label for="line">Yardage line (required)<span class="auto">auto</span></label><input id="line" type="number" step="0.5" min="0" placeholder="e.g. 72.5"></div>
+      <div><label for="overOdds">Over odds<span class="auto">auto</span></label><input id="overOdds" type="number" step="1" placeholder="-110"></div>
+      <div><label for="underOdds">Under odds<span class="auto">auto</span></label><input id="underOdds" type="number" step="1" placeholder="-110"></div>
+    </div>
+    <div class="info" id="oddsInfo"></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <details class="card">
+    <summary>Settings</summary>
+    <div>
+      <label for="weight">Matchup confidence: <span id="weightVal">50</span>%</label>
+      <input id="weight" type="range" min="0" max="100" step="5" value="50">
+      <span class="hint">How much of the coverage and defense edge to trust. Use 30–40% early in the season and 60–70% once splits have 100+ routes.</span>
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div><label for="edgeThresh">Flag edges larger than (%)</label><input id="edgeThresh" type="number" step="1" min="1" value="20"></div>
+      <div><label for="precipF">Heavy rain/snow factor</label><input id="precipF" type="number" step="0.01" min="0.5" max="1" value="0.95">
+        <span class="hint">An assumption, not fitted (free data has no historical precipitation). Tune it with your log.</span></div>
+    </div>
+  </details>
+</div>
+
+<!-- OUTPUT -->
+<div class="col">
+<section class="card output">
+  <h2>Projection</h2>
+  <div class="sub" id="outTitle">Enter inputs to generate a projection</div>
+  <div style="display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;margin-top:4px">
+    <div><div class="big" id="outYards">—</div><div class="sub">projected yards (mean)</div></div>
+    <div><div class="big" id="outFair" style="font-size:1.8rem">—</div><div class="sub">fair line (median)</div></div>
+  </div>
+  <ul class="errors" id="outErrors"></ul>
+  <div class="kpis" id="kpis"></div>
+  <div id="outRec"></div>
+  <div id="outFlag"></div>
+  <table style="margin-top:12px">
+    <thead><tr><th>Component</th><th class="num">Input</th><th class="num">Factor</th></tr></thead>
+    <tbody id="outBreak"></tbody>
+  </table>
+  <div class="row-actions">
+    <button class="primary" type="button" id="saveBtn">Save to log</button>
+    <button type="button" id="resetBtn">Reset inputs</button>
+  </div>
+  <div class="formula">Mean = Baseline YPG (season/L4 blend)
+  × TS factor × volume × coverage × defense × QB × weather
+Fair line = Mean × historical median ratio
+P(Over) = share of historical outcomes above line ÷ mean</div>
+</section>
+</div>
+
+<!-- LOG -->
+<section class="card full">
+  <h2>Projection log &amp; accuracy tracker</h2>
+  <div class="sub">Enter actual yards after each game. Bets are graded on the side the model recommended, at 1 unit each. The log is saved in this browser only.</div>
+  <div class="stats" id="logStats"></div>
+  <div class="log-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Player</th><th>Opp</th><th>Wk</th><th class="num">Mean</th><th class="num">Fair</th><th class="num">Line</th><th>Side</th><th class="num">Odds</th><th class="num">EV</th><th class="num">Actual</th><th class="num">Result</th><th></th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+  <div class="row-actions">
+    <button type="button" id="exportBtn">Export CSV</button>
+    <button type="button" id="clearBtn">Clear log</button>
+  </div>
+</section>
 </main>
 
 <script>
 (function(){
-  const COVERAGES = {
-    simple:   ['Man', 'Zone'],
-    shell:    ['Single-high (MOFC)', 'Two-high (MOFO)'],
-    detailed: ['Cover 0', 'Cover 1', 'Cover 2', '2-Man', 'Cover 3', 'Cover 4 (Quarters)', 'Cover 6', 'Other']
-  };
-  const FIELDS = ['player','opp','week','yprrAll','ypg','seasonTS','projTS','attAvg','attProj','oppYPA','lgYPA','line','weight'];
-  const INPUT_KEY = 'wrModel.inputs.v1', LOG_KEY = 'wrModel.log.v1';
+'use strict';
+// Fallback fits used only if data/data.json can't be loaded (fitted on nflverse 2018-2025).
+const FALLBACK_FITS = {"dist":[{"lo":0,"hi":45,"label":"<45","n":6264,"q":[-0.2811,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0754,0.1239,0.1449,0.1677,0.1841,0.2003,0.2215,0.2393,0.2575,0.2756,0.2928,0.3111,0.3286,0.3491,0.3628,0.3784,0.3952,0.4094,0.4286,0.446,0.4622,0.4831,0.4988,0.5197,0.5378,0.5558,0.5712,0.5922,0.6131,0.6302,0.6512,0.6654,0.6852,0.7048,0.7232,0.7445,0.764,0.7817,0.8025,0.8289,0.8484,0.8652,0.8878,0.913,0.9363,0.9562,0.9735,0.9941,1.0179,1.0445,1.0706,1.093,1.1206,1.1499,1.1811,1.2066,1.2346,1.2609,1.2884,1.3224,1.3503,1.3859,1.4264,1.4514,1.4873,1.5259,1.5652,1.6078,1.6446,1.6798,1.7278,1.7661,1.8194,1.8859,1.9432,1.9952,2.0441,2.1061,2.1725,2.2547,2.3324,2.409,2.5255,2.6457,2.781,3.0108,3.3463,3.8124,7.0919]},{"lo":45,"hi":70,"label":"45-70","n":3543,"q":[-0.0621,0.0,0.0,0.0,0.0,0.0739,0.11,0.1344,0.1608,0.1838,0.2072,0.2332,0.2531,0.2771,0.2952,0.3164,0.3351,0.3504,0.3705,0.3851,0.4045,0.4242,0.4374,0.451,0.4696,0.4893,0.5058,0.5174,0.5347,0.5511,0.5664,0.5827,0.5999,0.6138,0.6289,0.6436,0.6571,0.672,0.6928,0.7113,0.725,0.7401,0.754,0.7689,0.784,0.8013,0.8173,0.833,0.8491,0.8679,0.883,0.8977,0.9113,0.9298,0.9481,0.9653,0.9815,1.0002,1.0181,1.0369,1.0558,1.0732,1.1009,1.1189,1.1425,1.1598,1.1767,1.2016,1.2226,1.2444,1.2627,1.2889,1.3105,1.3398,1.3663,1.3886,1.4181,1.4465,1.4786,1.5038,1.5398,1.5797,1.6059,1.6438,1.6796,1.716,1.7664,1.8051,1.841,1.8957,1.9476,2.0075,2.0674,2.1495,2.2244,2.2891,2.3915,2.4999,2.7675,3.0424,4.9864]},{"lo":70,"hi":999,"label":"70+","n":1681,"q":[-0.0627,0.0,0.0536,0.1148,0.1512,0.1736,0.2125,0.2484,0.2672,0.2949,0.3137,0.3312,0.3443,0.3652,0.3874,0.402,0.4133,0.4359,0.4515,0.4704,0.4849,0.5017,0.5155,0.5276,0.545,0.561,0.572,0.5889,0.6008,0.616,0.6331,0.6493,0.6621,0.6813,0.6929,0.7109,0.7196,0.7351,0.7535,0.7656,0.7812,0.7947,0.8094,0.8234,0.8351,0.8492,0.8675,0.8824,0.8939,0.9065,0.9263,0.9404,0.9537,0.9636,0.9792,0.9954,1.0072,1.0225,1.0342,1.0469,1.0609,1.0786,1.0982,1.1157,1.1318,1.1445,1.1669,1.1806,1.203,1.2219,1.2485,1.265,1.2865,1.3111,1.3378,1.3595,1.3761,1.4024,1.4188,1.4331,1.4495,1.4781,1.4912,1.5223,1.5511,1.5846,1.6215,1.6675,1.6998,1.7265,1.7688,1.825,1.8722,1.953,2.0365,2.1302,2.1974,2.2986,2.4384,2.7089,4.3106]}],"passAtt":[{"minG":0,"maxG":5,"b0":13.824,"bAvg":0.2936,"bSpread":0.0028,"bTotal":0.225,"r2":0.057,"sd":8.16,"n":768},{"minG":6,"maxG":9,"b0":9.704,"bAvg":0.4739,"bSpread":0.0631,"bTotal":0.1688,"r2":0.08,"sd":7.94,"n":1024},{"minG":10,"maxG":98,"b0":-1.071,"bAvg":0.6283,"bSpread":-0.0144,"bTotal":0.2961,"r2":0.13,"sd":7.61,"n":1694}],"wind":{"indoor":{"factor":1.023,"n":1280},"buckets":[{"lo":0,"hi":10,"label":"0-9 mph","factor":1.003,"n":1742},{"lo":10,"hi":15,"label":"10-14 mph","factor":0.971,"n":598},{"lo":15,"hi":20,"label":"15-19 mph","factor":0.941,"n":244},{"lo":20,"hi":99,"label":"20+ mph","factor":0.926,"n":62}]},"qbPrior":6.36,"seasons":"2018-2025"};
 
-  const $ = id => document.getElementById(id);
-  const num = id => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
-  const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2), f3 = v => v.toFixed(3);
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const store = {
-    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
-    set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
-  };
+const COVERAGES = {
+  simple:   ['Man', 'Zone'],
+  shell:    ['Single-high (MOFC)', 'Two-high (MOFO)'],
+  detailed: ['Cover 0', 'Cover 1', 'Cover 2', '2-Man', 'Cover 3', 'Cover 4 (Quarters)', 'Cover 6', 'Other']
+};
+// Home stadium coordinates. Type: o = open air, d = fixed dome, r = retractable roof.
+const STADIUMS = {
+  ARI:[33.5276,-112.2626,'r'], ATL:[33.7554,-84.4008,'r'], BAL:[39.2780,-76.6227,'o'], BUF:[42.7738,-78.7870,'o'],
+  CAR:[35.2258,-80.8528,'o'], CHI:[41.8623,-87.6167,'o'], CIN:[39.0955,-84.5161,'o'], CLE:[41.5061,-81.6995,'o'],
+  DAL:[32.7473,-97.0945,'r'], DEN:[39.7439,-105.0201,'o'], DET:[42.3400,-83.0456,'d'], GB:[44.5013,-88.0622,'o'],
+  HOU:[29.6847,-95.4107,'r'], IND:[39.7601,-86.1639,'r'], JAX:[30.3239,-81.6373,'o'], KC:[39.0489,-94.4839,'o'],
+  LA:[33.9535,-118.3392,'d'], LAC:[33.9535,-118.3392,'d'], LV:[36.0909,-115.1833,'d'], MIA:[25.9580,-80.2389,'o'],
+  MIN:[44.9737,-93.2577,'d'], NE:[42.0909,-71.2643,'o'], NO:[29.9511,-90.0812,'d'], NYG:[40.8135,-74.0745,'o'],
+  NYJ:[40.8135,-74.0745,'o'], PHI:[39.9008,-75.1675,'o'], PIT:[40.4468,-80.0158,'o'], SEA:[47.5952,-122.3316,'o'],
+  SF:[37.4030,-121.9700,'o'], TB:[27.9759,-82.5033,'o'], TEN:[36.1665,-86.7713,'o'], WAS:[38.9077,-76.8645,'o']
+};
+const FIELDS = ['player','team','opp','week','yprrAll','ypg','l4ypg','seasonTS','l4TS','projTS','attAvg','teamG','total',
+  'spread','projAtt','oppYPA','lgYPA','incYA','qbYA','wind','line','overOdds','underOdds','weight','seasonW','edgeThresh','precipF'];
+const CHECKS = ['indoor','precip'];
+const K = { inputs:'wrModel.inputs.v2', log:'wrModel.log.v2', oldLog:'wrModel.log.v1', cov:'wrModel.covmem.v1', book:'wrModel.book' };
 
-  let mode = 'simple';
-  let lastResult = null;
+const $ = id => document.getElementById(id);
+const num = id => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
+const set = (id, v) => { $(id).value = (v === null || v === undefined || Number.isNaN(v)) ? '' : v; };
+const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2), f3 = v => v.toFixed(3);
+const pct = v => (v*100).toFixed(1) + '%';
+const sgn = v => (v >= 0 ? '+' : '') ;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const normName = s => (s||'').toLowerCase().replace(/[.'’]/g,'').replace(/-/g,' ').replace(/\b(jr|sr|ii|iii|iv|v)\b/g,'').replace(/\s+/g,' ').trim();
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
 
-  // ---------- Coverage table ----------
-  function buildCoverageRows(rates = [], yprrs = []){
-    $('covBody').innerHTML = COVERAGES[mode].map((c,i) => `
-      <tr>
-        <td>${c}</td>
-        <td class="num"><input class="covRate" type="number" step="0.1" min="0" max="100" placeholder="%" value="${rates[i] ?? ''}"></td>
-        <td class="num"><input class="covYprr" type="number" step="0.01" min="0" placeholder="YPRR" value="${yprrs[i] ?? ''}"></td>
-      </tr>`).join('');
-    document.querySelectorAll('.toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+let DATA = null, FITS = FALLBACK_FITS, mode = 'simple', curId = null, out = new Set(), lastResult = null;
+
+// ---------------- Odds math ----------------
+const implied = o => o < 0 ? -o/(-o+100) : 100/(o+100);
+const profit = o => o < 0 ? 100*100/(-o) : o;            // profit on a $100 stake
+const ev = (p, o) => p*profit(o) - (1-p)*100;
+const fmtOdds = o => (o > 0 ? '+' : '') + o;
+
+// ---------------- Distribution ----------------
+function distFor(mean){
+  const d = FITS && FITS.dist; if (!d) return null;
+  return d.find(b => mean >= b.lo && mean < b.hi) || (mean < d[0].lo ? d[0] : d[d.length-1]);
+}
+function cdf(q, x){
+  if (x <= q[0]) return 0; if (x >= q[100]) return 1;
+  for (let i = 0; i < 100; i++){
+    if (x < q[i+1]){ const span = q[i+1]-q[i]; return (i + (span > 0 ? (x-q[i])/span : 0)) / 100; }
   }
-  const readCov = () => ({
-    rates: [...document.querySelectorAll('.covRate')].map(e => e.value),
-    yprrs: [...document.querySelectorAll('.covYprr')].map(e => e.value)
-  });
+  return 1;
+}
 
-  // ---------- Core model ----------
-  function calc(){
-    const errs = [];
-    const ypg = num('ypg'), yprrAll = num('yprrAll');
-    const seasonTS = num('seasonTS'), projTS = num('projTS');
-    const attAvg = num('attAvg'), attProj = num('attProj');
-    const oppYPA = num('oppYPA'), lgYPA = num('lgYPA');
-    const w = (num('weight') ?? 50) / 100;
-    $('weightVal').textContent = Math.round(w*100);
+// ---------------- Coverage table ----------------
+function buildCoverageRows(rates = [], yprrs = []){
+  $('covBody').innerHTML = COVERAGES[mode].map((c,i) => `
+    <tr><td>${c}</td>
+      <td class="num"><input class="covRate" type="number" step="0.1" min="0" max="100" placeholder="%" value="${esc(rates[i] ?? '')}"></td>
+      <td class="num"><input class="covYprr" type="number" step="0.01" min="0" placeholder="YPRR" value="${esc(yprrs[i] ?? '')}"></td></tr>`).join('');
+  document.querySelectorAll('.toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+const readCov = () => ({
+  rates: [...document.querySelectorAll('.covRate')].map(e => e.value),
+  yprrs: [...document.querySelectorAll('.covYprr')].map(e => e.value)
+});
+// Remember coverage rates per opponent/week and YPRR splits per player.
+function rememberCoverage(){
+  const mem = store.get(K.cov) || {}; const c = readCov();
+  const opp = $('opp').value.trim().toUpperCase(), wk = $('week').value.trim(), pl = normName($('player').value);
+  if (opp && c.rates.some(v => v !== '')) mem[`cov|${wk}|${opp}|${mode}`] = c.rates;
+  if (pl && (c.yprrs.some(v => v !== '') || $('yprrAll').value)) mem[`yprr|${pl}|${mode}`] = { y: c.yprrs, all: $('yprrAll').value };
+  store.set(K.cov, mem);
+}
+function recallCoverage(resetAll = false){
+  const mem = store.get(K.cov) || {};
+  const opp = $('opp').value.trim().toUpperCase(), wk = $('week').value.trim(), pl = normName($('player').value);
+  const rates = mem[`cov|${wk}|${opp}|${mode}`], yp = mem[`yprr|${pl}|${mode}`];
+  buildCoverageRows(rates || [], yp ? yp.y : []);
+  if (yp && yp.all) set('yprrAll', yp.all); else if (resetAll) set('yprrAll', null);
+}
 
-    if (ypg === null)                     errs.push('Season receiving yards / game is required.');
-    if (yprrAll === null || yprrAll <= 0) errs.push('Player overall YPRR is required.');
-    if (num('line') === null || num('line') <= 0) errs.push('Sportsbook yardage line is required.');
-
-    // Coverage rates are normalized to 100% because sources often leave a few % unclassified.
-    const cov = readCov();
-    const rates = cov.rates.map(v => Math.max(0, parseFloat(v) || 0));
-    const sum = rates.reduce((a,b) => a+b, 0);
-    const sumEl = $('covSum');
-    if (sum === 0){ sumEl.className='sumline bad'; sumEl.textContent='Enter the defense coverage rates.'; errs.push('Enter at least one defense coverage rate.'); }
-    else if (Math.abs(sum-100) <= 0.5){ sumEl.className='sumline ok'; sumEl.textContent=`Total: ${f1(sum)}% ✓`; }
-    else { sumEl.className='sumline warn'; sumEl.textContent=`Total: ${f1(sum)}%. Rates will be scaled to 100%.`; }
-
-    // Target share
-    let tsFactor = 1, tsNote = 'not used';
-    if (projTS !== null || seasonTS !== null){
-      if (projTS !== null && seasonTS !== null && seasonTS > 0){ tsFactor = projTS / seasonTS; tsNote = `${f1(projTS)}% ÷ ${f1(seasonTS)}%`; }
-      else errs.push('Enter both season and projected target share, or leave both blank.');
-    }
-
-    // Pass volume (optional)
-    let volFactor = 1, volNote = 'not used';
-    if (attAvg !== null && attProj !== null && attAvg > 0){ volFactor = attProj / attAvg; volNote = `${f1(attProj)} ÷ ${f1(attAvg)}`; }
-    else if (attAvg !== null || attProj !== null) volNote = 'needs both fields';
-
-    // Defense efficiency (optional, shrunk by w)
-    let defRaw = 1, defFactor = 1, defNote = 'not used';
-    if (oppYPA !== null && lgYPA !== null && lgYPA > 0){ defRaw = oppYPA / lgYPA; defFactor = 1 + w*(defRaw-1); defNote = `${f1(oppYPA)} ÷ ${f1(lgYPA)} (raw ×${f3(defRaw)})`; }
-    else if (oppYPA !== null || lgYPA !== null) defNote = 'needs both fields';
-
-    if (errs.length){ render(null, errs); return null; }
-
-    // Coverage-weighted YPRR
-    const yprrs = cov.yprrs.map(v => { const x = parseFloat(v); return Number.isFinite(x) ? x : yprrAll; });
-    const matchupYPRR = rates.reduce((acc, r, i) => acc + (r/sum) * yprrs[i], 0);
-    const covRaw = matchupYPRR / yprrAll;
-    const covFactor = 1 + w*(covRaw - 1);
-
-    const proj = ypg * tsFactor * volFactor * covFactor * defFactor;
-    const res = {
-      proj, ypg, tsFactor, tsNote, volFactor, volNote, covRaw, covFactor, matchupYPRR, yprrAll,
-      defFactor, defNote, w, line: num('line'),
-      player: $('player').value.trim(), opp: $('opp').value.trim(), week: $('week').value.trim()
-    };
-    render(res, []);
-    return res;
+// ---------------- Data loading ----------------
+async function loadData(){
+  const urls = [], h = location.hostname;
+  if (h.endsWith('.github.io')){
+    const user = h.split('.')[0], seg = location.pathname.split('/').filter(Boolean)[0];
+    const repo = seg && !seg.endsWith('.html') ? seg : h;
+    urls.push(`https://raw.githubusercontent.com/${user}/${repo}/main/data/data.json?t=${Date.now()}`);
   }
-
-  function render(r, errs){
-    lastResult = r;
-    $('outErrors').innerHTML = errs.map(e => `<li>${esc(e)}</li>`).join('');
-    if (!r){ $('outYards').textContent='—'; $('outBreak').innerHTML=''; $('outEdge').innerHTML='';
-             $('outTitle').textContent='Enter inputs to generate a projection'; return; }
-
-    const who = [r.player || 'Player', r.opp ? `vs ${r.opp}` : '', r.week ? `· Wk ${r.week}` : ''].join(' ').trim();
-    $('outTitle').textContent = who;
-    $('outYards').textContent = f1(r.proj);
-
-    const fx = v => `<span class="${v>1.0005?'ok':v<0.9995?'bad':''}">×${f3(v)}</span>`;
-    $('outBreak').innerHTML = `
-      <tr><td>Baseline (season YPG)</td><td class="num">${f1(r.ypg)}</td><td class="num">—</td></tr>
-      <tr><td>Target share</td><td class="num">${esc(r.tsNote)}</td><td class="num">${fx(r.tsFactor)}</td></tr>
-      <tr><td>Team pass volume</td><td class="num">${esc(r.volNote)}</td><td class="num">${fx(r.volFactor)}</td></tr>
-      <tr><td>Coverage matchup<br><span class="sub">raw ×${f3(r.covRaw)} at ${Math.round(r.w*100)}% weight</span></td>
-          <td class="num">${f2(r.matchupYPRR)} vs ${f2(r.yprrAll)} YPRR</td><td class="num">${fx(r.covFactor)}</td></tr>
-      <tr><td>Defense efficiency</td><td class="num">${esc(r.defNote)}</td><td class="num">${fx(r.defFactor)}</td></tr>
-      <tr><td><b>Projection</b></td><td></td><td class="num"><b>${f1(r.proj)} yds</b></td></tr>`;
-
-    {
-      const d = r.proj - r.line, pct = d / r.line * 100;
-      const side = d > 0 ? 'OVER' : d < 0 ? 'UNDER' : 'NO EDGE';
-      const cls = d > 0 ? 'ok' : d < 0 ? 'bad' : '';
-      $('outEdge').innerHTML = `<div class="edge">Line ${f1(r.line)} → model is <b class="${cls}">${d>=0?'+':''}${f1(d)} yds (${pct>=0?'+':''}${f1(pct)}%)</b>, leaning <b class="${cls}">${side}</b></div>`;
-    }
+  urls.push('data/data.json?t=' + Date.now());
+  for (const u of urls){
+    try { const r = await fetch(u, {cache:'no-store'}); if (r.ok) return await r.json(); } catch(e){}
   }
+  return null;
+}
+function renderStatus(){
+  if (!DATA){ $('dataStatus').innerHTML = '<span class="warn">No data file found: manual mode.</span> Enter every field by hand. Distributions use built-in defaults.'; $('pickCard').classList.add('hidden'); return; }
+  const m = DATA.meta, o = m.odds || {};
+  $('dataStatus').innerHTML = `Data: <b>${m.season} Week ${m.week}</b> · stats updated <b>${esc(m.generated)}</b>` +
+    (o.updated ? ` · props updated <b>${esc(o.updated)}</b>${o.creditsRemaining != null ? ` (${esc(o.creditsRemaining)} API credits left)` : ''}` : ' · <span class="warn">no props pulled yet</span>');
+}
+function teamsThisWeek(){ const s = new Set(); (DATA.games||[]).forEach(g => { s.add(g.home); s.add(g.away); }); return s; }
+function buildPicker(){
+  const playing = teamsThisWeek();
+  let list = Object.entries(DATA.players).filter(([,p]) => (p.pos === 'WR' || p.pos === 'TE') && p.g >= 1);
+  const onSlate = list.filter(([,p]) => playing.has(p.team));
+  if (onSlate.length) list = onSlate;
+  list.sort((a,b) => b[1].ypg - a[1].ypg);
+  window.__pickMap = {};
+  $('pickList').innerHTML = list.map(([id,p]) => {
+    const label = `${p.name} · ${p.team} ${p.pos}`; window.__pickMap[label] = id;
+    return `<option value="${esc(label)}">`; }).join('');
+}
 
-  // ---------- Persistence of inputs ----------
-  function saveInputs(){
-    const s = { mode, cov: readCov(), fields: {} };
-    FIELDS.forEach(id => s.fields[id] = $(id).value);
-    store.set(INPUT_KEY, s);
+// ---------------- Player loading ----------------
+function gameFor(team){ return (DATA.games||[]).find(g => g.home === team || g.away === team); }
+function loadPlayer(id, fill = true){
+  const p = DATA.players[id]; if (!p) return;
+  curId = id;
+  const t = DATA.teams[p.team] || {}, g = gameFor(p.team);
+  const home = g ? g.home === p.team : null, opp = g ? (home ? g.away : g.home) : '';
+  if (fill){
+    set('player', p.name); set('team', p.team); set('week', DATA.meta.week); set('opp', opp);
+    set('ypg', p.ypg); set('l4ypg', p.l4ypg); set('seasonTS', p.ts); set('l4TS', p.l4ts);
+    set('attAvg', t.attPg); set('teamG', t.g); set('lgYPA', DATA.league.ya);
+    set('oppYPA', opp && DATA.teams[opp] ? DATA.teams[opp].oppYA : null);
+    set('total', g ? g.total : null);
+    set('spread', g && g.spread != null ? (home ? g.spread : -g.spread) : null);
+    out = new Set((t.catchers||[]).filter(c => c.id !== id && (c.status === 'Out' || c.status === 'Doubtful')).map(c => c.id));
+    recallCoverage(true);
   }
-  function loadInputs(){
-    const s = store.get(INPUT_KEY);
-    if (s && COVERAGES[s.mode]) mode = s.mode;
-    buildCoverageRows(s?.cov?.rates, s?.cov?.yprrs);
-    if (s?.fields) FIELDS.forEach(id => { if (s.fields[id] != null) $(id).value = s.fields[id]; });
-    if (s?.fields && ['attAvg','attProj','oppYPA','lgYPA'].some(id => s.fields[id])) $('optBox').open = true;
+  // game info
+  if (g){
+    const st = p.status ? ` <span class="badge b-${esc(p.status)}">${esc(p.name)}: ${esc(p.status)}</span>` : '';
+    const sp = num('spread');
+    $('gameInfo').innerHTML = `<b>${esc(p.team)}</b> ${home ? 'vs' : '@'} <b>${esc(opp)}</b> · ${esc(g.gameday)} ${esc(g.gametime)} ET · ` +
+      `${sp == null ? 'spread n/a' : (sp > 0 ? 'favored by ' + sp : sp < 0 ? 'underdog by ' + (-sp) : "pick'em")} · total ${g.total ?? 'n/a'}${st}` +
+      `<br>Last games (wk, opp, tgt, yds): ${p.log.map(l => `W${l[0]} ${esc(l[1])} ${l[2]}/${l[3]}`).join(' · ')}`;
+  } else $('gameInfo').innerHTML = '<span class="warn">No game found for this team this week.</span>';
+  renderMates(); if (fill) recomputeTS();
+  fillQBs(fill); if (fill) recomputeAtt();
+  fillBooks(fill);
+  if (fill) setupWeather(g, p.team); else describeVenue(g);
+}
+
+// ---------------- #13 Target redistribution ----------------
+function blend(ts, l4){ const w = (num('seasonW') ?? 60)/100; return l4 == null ? ts : w*ts + (1-w)*l4; }
+function renderMates(){
+  const p = curId && DATA && DATA.players[curId], t = p && DATA.teams[p.team];
+  if (!t || !t.catchers){ $('mateBox').classList.add('hidden'); return; }
+  $('mateBox').classList.remove('hidden');
+  $('mateBody').innerHTML = t.catchers.filter(c => c.id !== curId).map(c => `
+    <tr><td><input type="checkbox" class="mateOut" data-id="${esc(c.id)}" ${out.has(c.id) ? 'checked' : ''}></td>
+      <td>${esc(c.name)} <span class="muted">${esc(c.pos)}</span>${c.status ? `<span class="badge b-${esc(c.status)}">${esc(c.status)}</span>` : ''}</td>
+      <td class="num">${f1(c.ts)}%</td><td class="num">${f1(c.l4ts)}%</td><td class="num">${f1(blend(c.ts, c.l4ts))}%</td></tr>`).join('');
+}
+function recomputeTS(){
+  const p = curId && DATA && DATA.players[curId], t = p && DATA.teams[p.team];
+  if (!t) return;
+  const base = blend(num('seasonTS') ?? p.ts, num('l4TS'));
+  const vac = t.catchers.filter(c => out.has(c.id)).reduce((a,c) => a + blend(c.ts, c.l4ts), 0);
+  const proj = vac < 100 ? base / (1 - vac/100) : base;
+  set('projTS', +proj.toFixed(1));
+  $('mateInfo').textContent = vac > 0 ? `Vacated: ${f1(vac)}% of team targets → ${p.name}'s share rises from ${f1(base)}% to ${f1(proj)}%.` : 'No teammates marked out.';
+}
+
+// ---------------- #11 Pass attempts ----------------
+function recomputeAtt(){
+  const fits = FITS && FITS.passAtt; const avg = num('attAvg'), tot = num('total'), g = num('teamG') ?? 10;
+  if (!fits || avg == null || tot == null) return;
+  const b = fits.find(f => g >= f.minG && g <= f.maxG) || fits[fits.length-1];
+  const v = b.b0 + b.bAvg*avg + b.bSpread*(num('spread') ?? 0) + b.bTotal*tot;
+  set('projAtt', +v.toFixed(1));
+  $('attHint').textContent = `Fit for teams with ${b.minG}–${b.maxG > 50 ? '17' : b.maxG} games: ${b.b0.toFixed(1)} + ${b.bAvg.toFixed(2)}×avg + ${b.bTotal.toFixed(2)}×total ` +
+    `(${b.bSpread >= 0 ? '+' : ''}${b.bSpread.toFixed(2)}×spread). Typical miss ±${b.sd} attempts.`;
+}
+
+// ---------------- #7 QB ----------------
+function fillQBs(fill){
+  const p = curId && DATA && DATA.players[curId], t = p && DATA.teams[p.team];
+  if (!t || !t.qbs || !t.qbs.length){ $('qbSelWrap').classList.add('hidden'); return; }
+  $('qbSelWrap').classList.remove('hidden');
+  const inc = t.qbs.find(q => q.incumbent) || t.qbs[0];
+  $('qbSel').innerHTML = t.qbs.map(q => `<option value="${esc(q.id)}">${esc(q.name)}${q.incumbent ? ' (usual starter)' : ''} · ${f2(q.ya)} Y/A${q.status ? ' · ' + esc(q.status) : ''}</option>`).join('');
+  if (fill){
+    const healthy = t.qbs.filter(q => q.status !== 'Out' && q.status !== 'Doubtful');
+    const starter = (inc.status === 'Out' || inc.status === 'Doubtful') && healthy.length ? healthy[0] : inc;
+    $('qbSel').value = starter.id; set('incYA', inc.ya); set('qbYA', starter.ya);
+  } else {
+    const saved = store.get(K.inputs); if (saved && saved.qb) $('qbSel').value = saved.qb;
   }
+}
 
-  // ---------- Log ----------
-  const getLog = () => store.get(LOG_KEY) || [];
-  const setLog = l => { store.set(LOG_KEY, l); renderLog(); };
-
-  function renderLog(){
-    const log = getLog();
-    $('logBody').innerHTML = log.length ? log.map((e,i) => {
-      const act = parseFloat(e.actual);
-      const err = Number.isFinite(act) ? act - e.proj : null;
-      return `<tr>
-        <td>${esc(e.date)}</td><td>${esc(e.player)}</td><td>${esc(e.opp)}</td><td>${esc(e.week)}</td>
-        <td class="num">${f1(e.proj)}</td><td class="num">${e.line!=null?f1(e.line):'—'}</td>
-        <td class="num"><input type="number" step="1" data-i="${i}" class="actIn" value="${esc(e.actual ?? '')}"></td>
-        <td class="num ${err==null?'':err>=0?'ok':'bad'}">${err==null?'—':(err>=0?'+':'')+f1(err)}</td>
-        <td><button type="button" data-del="${i}">✕</button></td></tr>`;
-    }).join('') : `<tr><td colspan="9" class="sub">No saved projections yet.</td></tr>`;
-
-    const done = log.filter(e => Number.isFinite(parseFloat(e.actual)));
-    if (!done.length){ $('logStats').innerHTML = `<span>Saved: <b>${log.length}</b></span><span class="sub">Enter actual yards to see accuracy stats.</span>`; return; }
-    const errs = done.map(e => parseFloat(e.actual) - e.proj);
-    const mae = errs.reduce((a,b)=>a+Math.abs(b),0) / errs.length;
-    const bias = errs.reduce((a,b)=>a+b,0) / errs.length;
-    const withLine = done.filter(e => e.line != null && e.proj !== e.line && parseFloat(e.actual) !== e.line);
-    const hits = withLine.filter(e => (e.proj > e.line) === (parseFloat(e.actual) > e.line)).length;
-    $('logStats').innerHTML = `
-      <span>Saved: <b>${log.length}</b></span><span>Graded: <b>${done.length}</b></span>
-      <span>Mean abs. error: <b>${f1(mae)} yds</b></span>
-      <span>Bias: <b class="${bias>=0?'ok':'bad'}">${bias>=0?'+':''}${f1(bias)} yds</b> <span class="sub">(+ = model too low)</span></span>
-      ${withLine.length ? `<span>Side vs line: <b>${hits}/${withLine.length} (${f1(hits/withLine.length*100)}%)</b></span>` : ''}`;
+// ---------------- #8 Weather ----------------
+function venue(g, team){
+  if (!g) return null;
+  const home = g.home, s = STADIUMS[home];
+  if (g.location === 'Neutral' || !s) return { neutral:true, name:g.stadium };
+  const roof = g.roof;
+  const indoor = roof === 'dome' || roof === 'closed' || s[2] === 'd' || (s[2] === 'r' && roof !== 'open' && roof !== 'outdoors');
+  return { lat:s[0], lon:s[1], type:s[2], indoor, name:g.stadium };
+}
+function describeVenue(g){
+  const v = venue(g); if (!v) return;
+  if (v.neutral) $('wxInfo').innerHTML = `${esc(v.name)} (neutral site): enter weather manually.`;
+}
+async function setupWeather(g){
+  const v = venue(g);
+  if (!v){ $('wxInfo').textContent = 'No game found.'; calc(); return; }
+  if (v.neutral){ describeVenue(g); $('indoor').checked = false; set('wind', null); $('precip').checked = false; calc(); return; }
+  if (v.indoor){
+    $('indoor').checked = true; set('wind', null); $('precip').checked = false;
+    $('wxInfo').innerHTML = `${esc(v.name)}: ${v.type === 'r' ? 'retractable roof, assumed closed (uncheck if open)' : 'dome'}. Weather not a factor.`;
+    calc(); return;
   }
-
-  function exportCSV(){
-    const log = getLog(); if (!log.length) return;
-    const cols = ['date','player','opp','week','proj','line','actual','ypg','tsFactor','volFactor','covRaw','covFactor','defFactor','weight'];
-    const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
-    const csv = [cols.join(',')].concat(log.map(e => cols.map(c => q(typeof e[c]==='number' ? +e[c].toFixed(4) : e[c])).join(','))).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-    a.download = `receiving-yards-log-${new Date().toISOString().slice(0,10)}.csv`;
-    a.click(); URL.revokeObjectURL(a.href);
+  $('indoor').checked = false;
+  const days = (new Date(g.gameday) - new Date()) / 864e5;
+  if (days > 15){ $('wxInfo').textContent = `${v.name}: forecast not available yet (more than 16 days out).`; calc(); return; }
+  $('wxInfo').textContent = `${v.name}: fetching forecast…`;
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${v.lat}&longitude=${v.lon}` +
+      `&hourly=wind_speed_10m,wind_gusts_10m,precipitation,temperature_2m&wind_speed_unit=mph&precipitation_unit=inch` +
+      `&temperature_unit=fahrenheit&timezone=America%2FNew_York&start_date=${g.gameday}&end_date=${g.gameday}`;
+    const r = await fetch(url); const j = await r.json();
+    const h0 = parseInt((g.gametime || '13:00').split(':')[0], 10);
+    const idx = [h0, h0+1, h0+2].filter(i => i < j.hourly.time.length);
+    const avg = a => idx.reduce((s,i) => s + a[i], 0) / idx.length;
+    const wind = avg(j.hourly.wind_speed_10m), gust = Math.max(...idx.map(i => j.hourly.wind_gusts_10m[i]));
+    const pr = Math.max(...idx.map(i => j.hourly.precipitation[i])), temp = avg(j.hourly.temperature_2m);
+    set('wind', Math.round(wind)); $('precip').checked = pr >= 0.10;
+    $('wxInfo').innerHTML = `${esc(v.name)} · kickoff forecast (3-hr avg): <b>${Math.round(wind)} mph</b> wind (gusts ${Math.round(gust)}), ` +
+      `${pr.toFixed(2)} in/hr peak precip, ${Math.round(temp)}°F. <span class="muted">Source: Open-Meteo</span>`;
+  } catch(e){ $('wxInfo').innerHTML = `<span class="warn">Forecast fetch failed.</span> Enter wind manually.`; }
+  calc(); saveInputs();
+}
+function weatherFactor(){
+  const w = FITS && FITS.wind; let f = 1, note = 'not used';
+  if ($('indoor').checked){ f = w && w.indoor ? w.indoor.factor : 1; note = 'indoors'; }
+  else if (num('wind') != null && w){
+    const wind = num('wind'), b = w.buckets.find(x => wind >= x.lo && wind < x.hi) || w.buckets[w.buckets.length-1];
+    f = b.factor; note = `${wind} mph (${b.label})`;
   }
+  if ($('precip').checked){ const pf = num('precipF') ?? 0.95; f *= pf; note += ` + precip ×${pf}`; }
+  return { f, note };
+}
 
-  // ---------- Events ----------
-  document.addEventListener('input', e => {
-    if (e.target.classList.contains('actIn')){
-      const log = getLog(); log[+e.target.dataset.i].actual = e.target.value;
-      store.set(LOG_KEY, log);
-      clearTimeout(window.__logT); window.__logT = setTimeout(renderLog, 400);
-      return;
-    }
-    calc(); saveInputs();
-  });
-  $('logBody').addEventListener('click', e => {
-    const i = e.target.dataset.del; if (i === undefined) return;
-    const log = getLog(); log.splice(+i,1); setLog(log);
-  });
-  document.querySelectorAll('.toggle button').forEach(b => b.onclick = () => {
-    if (mode === b.dataset.mode) return;
-    mode = b.dataset.mode; buildCoverageRows(); calc(); saveInputs();
-  });
-  $('saveBtn').onclick = () => {
-    const r = calc(); if (!r) return;
-    const log = getLog();
-    log.unshift({ date: new Date().toISOString().slice(0,10), player: r.player, opp: r.opp, week: r.week,
-      proj: r.proj, line: r.line, actual: '', ypg: r.ypg, tsFactor: r.tsFactor, volFactor: r.volFactor,
-      covRaw: r.covRaw, covFactor: r.covFactor, defFactor: r.defFactor, weight: r.w });
-    setLog(log);
-  };
-  $('resetBtn').onclick = () => {
-    FIELDS.forEach(id => $(id).value = id==='weight' ? 50 : '');
-    buildCoverageRows(); calc(); saveInputs();
-  };
-  $('exportBtn').onclick = exportCSV;
-  $('clearBtn').onclick = () => { if (confirm('Delete every saved projection?')) setLog([]); };
+// ---------------- Odds ----------------
+function fillBooks(fill){
+  const name = $('player').value, list = DATA && DATA.odds ? (DATA.odds[normName(name)] || []) : [];
+  if (!list.length){
+    $('bookWrap').classList.add('hidden');
+    $('oddsInfo').textContent = DATA ? 'No props posted for this player yet. Enter the line and odds manually.' : '';
+    if (fill) ['line','overOdds','underOdds'].forEach(i => set(i, null));
+    return;
+  }
+  const books = [...list].sort((a,b) => a.book.localeCompare(b.book));
+  $('bookWrap').classList.remove('hidden');
+  $('bookSel').innerHTML = books.map((b,i) => `<option value="${i}">${esc(b.book)}: ${b.line} (${fmtOdds(b.over)} / ${fmtOdds(b.under)})</option>`).join('');
+  window.__books = books;
+  const lines = books.map(b => b.line).sort((a,b) => a-b), med = lines[Math.floor(lines.length/2)];
+  $('oddsInfo').textContent = `${books.length} book(s) · lines ${lines[0]}–${lines[lines.length-1]} · median ${med}. Shop for the best number.`;
+  const pref = store.get(K.book); let i = books.findIndex(b => b.book === pref); if (i < 0) i = 0;
+  if (fill){ $('bookSel').value = i; applyBook(i); }
+}
+function applyBook(i){ const b = window.__books[i]; if (!b) return; set('line', b.line); set('overOdds', b.over); set('underOdds', b.under); store.set(K.book, b.book); }
 
+// ---------------- Core model ----------------
+function calc(){
+  const errs = [];
+  const w = (num('weight') ?? 50)/100, ws = (num('seasonW') ?? 60)/100;
+  $('weightVal').textContent = Math.round(w*100); $('seasonWVal').textContent = Math.round(ws*100); $('recentWVal').textContent = Math.round(100-ws*100);
+  const ypg = num('ypg'), l4 = num('l4ypg'), yprrAll = num('yprrAll'), line = num('line');
+  if (ypg === null) errs.push('Season receiving yards / game is required.');
+  if (yprrAll === null || yprrAll <= 0) errs.push('Player overall YPRR is required (FTN).');
+  if (line === null || line <= 0) errs.push('Sportsbook yardage line is required.');
+
+  const cov = readCov(), rates = cov.rates.map(v => Math.max(0, parseFloat(v) || 0)), sum = rates.reduce((a,b) => a+b, 0);
+  const sumEl = $('covSum');
+  if (sum === 0){ sumEl.className = 'sumline bad'; sumEl.textContent = 'Enter the defense coverage rates.'; errs.push('Enter the defense coverage rates (FTN).'); }
+  else if (Math.abs(sum-100) <= 0.5){ sumEl.className = 'sumline ok'; sumEl.textContent = `Total: ${f1(sum)}% ✓`; }
+  else { sumEl.className = 'sumline warn'; sumEl.textContent = `Total: ${f1(sum)}%. Rates will be scaled to 100%.`; }
+
+  // #4 baseline blend
+  const base = ypg === null ? null : (l4 === null ? ypg : ws*ypg + (1-ws)*l4);
+  const baseNote = l4 === null ? `${ypg ?? '—'} season` : `${Math.round(ws*100)}% × ${ypg} + ${Math.round(100-ws*100)}% × ${l4}`;
+  // target share
+  const sTS = num('seasonTS'), lTS = num('l4TS'), pTS = num('projTS');
+  let tsF = 1, tsNote = 'not used';
+  if (pTS !== null){
+    const bTS = sTS === null ? null : (lTS === null ? sTS : ws*sTS + (1-ws)*lTS);
+    if (bTS) { tsF = pTS / bTS; tsNote = `${f1(pTS)}% ÷ ${f1(bTS)}% blend`; } else errs.push('Enter season target share to use projected target share.');
+  }
+  // #11 volume
+  const att = num('attAvg'), patt = num('projAtt');
+  const volF = att && patt ? patt/att : 1, volNote = att && patt ? `${f1(patt)} ÷ ${f1(att)}` : 'not used';
+  // defense
+  const oY = num('oppYPA'), lY = num('lgYPA');
+  const defRaw = oY && lY ? oY/lY : 1, defF = 1 + w*(defRaw-1), defNote = oY && lY ? `${f2(oY)} ÷ ${f2(lY)} (raw ×${f3(defRaw)})` : 'not used';
+  // #7 QB
+  const iY = num('incYA'), qY = num('qbYA');
+  const qbF = iY && qY ? qY/iY : 1, qbNote = iY && qY ? `${f2(qY)} ÷ ${f2(iY)}` : 'not used';
+  // #8 weather
+  const wx = weatherFactor();
+
+  if (errs.length){ render(null, errs); return null; }
+
+  const yprrs = cov.yprrs.map(v => { const x = parseFloat(v); return Number.isFinite(x) ? x : yprrAll; });
+  const mYPRR = rates.reduce((a, r, i) => a + (r/sum)*yprrs[i], 0), covRaw = mYPRR / yprrAll, covF = 1 + w*(covRaw-1);
+
+  const mean = base * tsF * volF * covF * defF * qbF * wx.f;
+
+  // #1 distribution
+  const d = distFor(mean);
+  const pOver = d ? 1 - cdf(d.q, line/mean) : null, fair = d ? mean * d.q[50] : null;
+  // #2 odds
+  const oO = num('overOdds') ?? -110, uO = num('underOdds') ?? -110;
+  const iO = implied(oO), iU = implied(uO), mktOver = iO/(iO+iU);
+  const evO = pOver == null ? null : ev(pOver, oO), evU = pOver == null ? null : ev(1-pOver, uO);
+  let side = null;
+  if (evO != null && (evO > 0 || evU > 0)) side = evO >= evU ? 'over' : 'under';
+  // #6 flag
+  const thr = (num('edgeThresh') ?? 20)/100, gap = fair != null ? (fair - line)/line : (mean - line)/line;
+
+  const r = { mean, fair, pOver, mktOver, oO, uO, iO, iU, evO, evU, side, gap, thr, line, base, baseNote, tsF, tsNote, volF, volNote,
+    covRaw, covF, mYPRR, yprrAll, defF, defNote, qbF, qbNote, wxF: wx.f, wxNote: wx.note, w, dist: d,
+    player: $('player').value.trim(), opp: $('opp').value.trim(), week: $('week').value.trim() };
+  render(r, []);
+  return r;
+}
+
+function render(r, errs){
+  lastResult = r;
+  $('outErrors').innerHTML = errs.map(e => `<li>${esc(e)}</li>`).join('');
+  if (!r){ ['outYards','outFair'].forEach(i => $(i).textContent = '—'); ['outBreak','kpis','outRec','outFlag'].forEach(i => $(i).innerHTML = '');
+           $('outTitle').textContent = 'Enter inputs to generate a projection'; return; }
+  $('outTitle').textContent = [r.player || 'Player', r.opp ? `vs ${r.opp}` : '', r.week ? `· Wk ${r.week}` : ''].join(' ').trim();
+  $('outYards').textContent = f1(r.mean);
+  $('outFair').textContent = r.fair != null ? f1(r.fair) : '—';
+
+  const pO = r.pOver;
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Model P(Over ${r.line})</div><div class="v">${pO != null ? pct(pO) : '—'}</div><div class="sub">Under ${pO != null ? pct(1-pO) : '—'}</div></div>
+    <div class="kpi"><div class="l">Market (no-vig)</div><div class="v">${pct(r.mktOver)}</div><div class="sub">${fmtOdds(r.oO)} / ${fmtOdds(r.uO)}</div></div>
+    <div class="kpi"><div class="l">EV per $100</div><div class="v"><span class="${r.evO > 0 ? 'ok' : 'bad'}">O ${r.evO != null ? sgn(r.evO) + f1(r.evO) : '—'}</span></div>
+      <div class="sub"><span class="${r.evU > 0 ? 'ok' : 'bad'}">U ${r.evU != null ? sgn(r.evU) + f1(r.evU) : '—'}</span></div></div>`;
+
+  if (r.side){
+    const p = r.side === 'over' ? pO : 1-pO, o = r.side === 'over' ? r.oO : r.uO, be = implied(o), e = r.side === 'over' ? r.evO : r.evU;
+    $('outRec').innerHTML = `<div class="rec pos">Model side: <b class="ok">${r.side.toUpperCase()} ${r.line}</b> at ${fmtOdds(o)}. ` +
+      `Win probability ${pct(p)} vs ${pct(be)} needed to break even. EV <b>${sgn(e)}$${f1(e)}</b> per $100.</div>`;
+  } else $('outRec').innerHTML = `<div class="rec">No positive-EV side at these prices. Fair line is ${r.fair != null ? f1(r.fair) : '—'} vs book ${r.line}.</div>`;
+
+  $('outFlag').innerHTML = Math.abs(r.gap) > r.thr
+    ? `<div class="banner flag">⚠ <b>Large edge (${sgn(r.gap)}${(r.gap*100).toFixed(0)}% vs line).</b> Edges this big usually mean an input error or news the market already has (injury, role change, weather). Re-check before betting.</div>` : '';
+
+  const fx = v => `<span class="${v > 1.0005 ? 'ok' : v < 0.9995 ? 'bad' : ''}">×${f3(v)}</span>`;
+  $('outBreak').innerHTML = `
+    <tr><td>Baseline YPG</td><td class="num">${esc(r.baseNote)}</td><td class="num">${f1(r.base)}</td></tr>
+    <tr><td>Target share</td><td class="num">${esc(r.tsNote)}</td><td class="num">${fx(r.tsF)}</td></tr>
+    <tr><td>Pass volume</td><td class="num">${esc(r.volNote)}</td><td class="num">${fx(r.volF)}</td></tr>
+    <tr><td>Coverage matchup<br><span class="sub">raw ×${f3(r.covRaw)} at ${Math.round(r.w*100)}%</span></td><td class="num">${f2(r.mYPRR)} vs ${f2(r.yprrAll)} YPRR</td><td class="num">${fx(r.covF)}</td></tr>
+    <tr><td>Defense efficiency</td><td class="num">${esc(r.defNote)}</td><td class="num">${fx(r.defF)}</td></tr>
+    <tr><td>QB</td><td class="num">${esc(r.qbNote)}</td><td class="num">${fx(r.qbF)}</td></tr>
+    <tr><td>Weather</td><td class="num">${esc(r.wxNote)}</td><td class="num">${fx(r.wxF)}</td></tr>
+    <tr><td><b>Mean projection</b></td><td></td><td class="num"><b>${f1(r.mean)}</b></td></tr>
+    <tr><td><b>Fair line (median)</b></td><td class="num sub">${r.dist ? `bucket ${esc(r.dist.label)} yds, n=${r.dist.n}` : ''}</td><td class="num"><b>${r.fair != null ? f1(r.fair) : '—'}</b></td></tr>`;
+}
+
+// ---------------- Persistence ----------------
+function saveInputs(){
+  const s = { mode, cov: readCov(), fields: {}, checks: {}, curId, out: [...out], qb: $('qbSel').value, week: DATA ? DATA.meta.week : null };
+  FIELDS.forEach(id => s.fields[id] = $(id).value);
+  CHECKS.forEach(id => s.checks[id] = $(id).checked);
+  store.set(K.inputs, s);
+}
+function loadInputs(){
+  const s = store.get(K.inputs);
+  if (s && COVERAGES[s.mode]) mode = s.mode;
+  buildCoverageRows(s?.cov?.rates, s?.cov?.yprrs);
+  if (s?.fields) FIELDS.forEach(id => { if (s.fields[id] != null && s.fields[id] !== '') $(id).value = s.fields[id]; });
+  if (s?.checks) CHECKS.forEach(id => $(id).checked = !!s.checks[id]);
+  if (s && DATA && s.curId && DATA.players[s.curId] && s.week === DATA.meta.week){
+    out = new Set(s.out || []); loadPlayer(s.curId, false);
+  }
+}
+
+// ---------------- Log ----------------
+function getLog(){
+  let l = store.get(K.log);
+  if (!l){ l = store.get(K.oldLog) || []; store.set(K.log, l); }
+  return l;
+}
+const setLog = l => { store.set(K.log, l); renderLog(); };
+function grade(e){
+  const a = parseFloat(e.actual); if (!Number.isFinite(a) || !e.side || e.line == null) return null;
+  if (a === e.line) return { res:'P', u:0 };
+  const won = e.side === 'over' ? a > e.line : a < e.line;
+  return { res: won ? 'W' : 'L', u: won ? profit(e.odds)/100 : -1 };
+}
+function renderLog(){
+  const log = getLog();
+  $('logBody').innerHTML = log.length ? log.map((e,i) => {
+    const g = grade(e), a = parseFloat(e.actual);
+    return `<tr><td>${esc(e.date)}</td><td>${esc(e.player)}</td><td>${esc(e.opp)}</td><td>${esc(e.week)}</td>
+      <td class="num">${f1(e.proj)}</td><td class="num">${e.fair != null ? f1(e.fair) : '—'}</td><td class="num">${e.line != null ? e.line : '—'}</td>
+      <td>${e.side ? esc(e.side) : '—'}</td><td class="num">${e.odds != null ? fmtOdds(e.odds) : '—'}</td><td class="num">${e.ev != null ? sgn(e.ev) + f1(e.ev) : '—'}</td>
+      <td class="num"><input type="number" step="1" data-i="${i}" class="actIn" value="${esc(e.actual ?? '')}"></td>
+      <td class="num ${g ? (g.res === 'W' ? 'ok' : g.res === 'L' ? 'bad' : '') : ''}">${g ? `${g.res} ${sgn(g.u)}${g.u.toFixed(2)}u` : (Number.isFinite(a) ? 'no bet' : '—')}</td>
+      <td><button type="button" data-del="${i}">✕</button></td></tr>`;
+  }).join('') : `<tr><td colspan="13" class="sub">No saved projections yet.</td></tr>`;
+
+  const done = log.filter(e => Number.isFinite(parseFloat(e.actual)));
+  if (!done.length){ $('logStats').innerHTML = `<span>Saved: <b>${log.length}</b></span><span class="sub">Enter actual yards to see accuracy stats.</span>`; return; }
+  const errs = done.map(e => parseFloat(e.actual) - e.proj);
+  const mae = errs.reduce((a,b) => a + Math.abs(b), 0) / errs.length, bias = errs.reduce((a,b) => a+b, 0) / errs.length;
+  const fairDone = done.filter(e => e.fair != null && e.line != null && parseFloat(e.actual) !== e.line);
+  const fairHit = fairDone.filter(e => (e.fair > e.line) === (parseFloat(e.actual) > e.line)).length;
+  const bets = done.map(grade).filter(Boolean), W = bets.filter(b => b.res === 'W').length, L = bets.filter(b => b.res === 'L').length, P = bets.filter(b => b.res === 'P').length;
+  const units = bets.reduce((a,b) => a + b.u, 0);
+  $('logStats').innerHTML = `
+    <span>Graded: <b>${done.length}</b></span>
+    <span>Mean abs. error: <b>${f1(mae)} yds</b></span>
+    <span>Bias: <b class="${bias >= 0 ? 'ok' : 'bad'}">${sgn(bias)}${f1(bias)} yds</b> <span class="sub">(+ = model too low)</span></span>
+    ${fairDone.length ? `<span>Fair line on right side: <b>${fairHit}/${fairDone.length} (${f1(fairHit/fairDone.length*100)}%)</b></span>` : ''}
+    ${bets.length ? `<span>Bets: <b>${W}-${L}${P ? '-' + P : ''}</b> · <b class="${units >= 0 ? 'ok' : 'bad'}">${sgn(units)}${units.toFixed(2)}u</b> · ROI <b>${sgn(units)}${(units/bets.length*100).toFixed(1)}%</b></span>` : ''}`;
+}
+function exportCSV(){
+  const log = getLog(); if (!log.length) return;
+  const cols = ['date','player','opp','week','proj','fair','line','side','odds','pSide','ev','actual','overOdds','underOdds','tsF','volF','covRaw','covF','defF','qbF','wxF','weight','seasonW'];
+  const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const csv = [cols.join(',')].concat(log.map(e => cols.map(c => q(typeof e[c] === 'number' ? +e[c].toFixed(4) : e[c])).join(','))).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `receiving-yards-log-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ---------------- Events ----------------
+const ATT_INPUTS = new Set(['attAvg','teamG','total','spread']), TS_INPUTS = new Set(['seasonTS','l4TS','seasonW']);
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.classList.contains('actIn')){
+    const log = getLog(); log[+t.dataset.i].actual = t.value; store.set(K.log, log);
+    clearTimeout(window.__logT); window.__logT = setTimeout(renderLog, 400); return;
+  }
+  if (t.id === 'pick'){ const id = window.__pickMap && window.__pickMap[t.value]; if (id){ loadPlayer(id, true); t.value = ''; t.blur(); } }
+  if (ATT_INPUTS.has(t.id)) recomputeAtt();
+  if (TS_INPUTS.has(t.id)){ recomputeTS(); renderMates(); }
+  if (t.classList.contains('covRate') || t.classList.contains('covYprr') || t.id === 'yprrAll') rememberCoverage();
+  calc(); saveInputs();
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.classList.contains('mateOut')){ t.checked ? out.add(t.dataset.id) : out.delete(t.dataset.id); recomputeTS(); }
+  else if (t.id === 'qbSel'){ const p = DATA.players[curId], q = DATA.teams[p.team].qbs.find(x => x.id === t.value); if (q) set('qbYA', q.ya); }
+  else if (t.id === 'bookSel') applyBook(+t.value);
+  else if (t.id === 'indoor' || t.id === 'precip'){} else return;
+  calc(); saveInputs();
+});
+$('logBody').addEventListener('click', e => {
+  const i = e.target.dataset.del; if (i === undefined) return;
+  const log = getLog(); log.splice(+i, 1); setLog(log);
+});
+document.querySelectorAll('.toggle button').forEach(b => b.onclick = () => {
+  if (mode === b.dataset.mode) return; mode = b.dataset.mode; recallCoverage(); calc(); saveInputs();
+});
+$('saveBtn').onclick = () => {
+  const r = calc(); if (!r) return;
+  const pSide = r.side ? (r.side === 'over' ? r.pOver : 1 - r.pOver) : null;
+  const log = getLog();
+  log.unshift({ date: new Date().toISOString().slice(0,10), player: r.player, opp: r.opp, week: r.week, proj: r.mean, fair: r.fair,
+    line: r.line, side: r.side, odds: r.side ? (r.side === 'over' ? r.oO : r.uO) : null, pSide, ev: r.side ? (r.side === 'over' ? r.evO : r.evU) : null,
+    actual: '', overOdds: r.oO, underOdds: r.uO, tsF: r.tsF, volF: r.volF, covRaw: r.covRaw, covF: r.covF, defF: r.defF, qbF: r.qbF, wxF: r.wxF,
+    weight: r.w, seasonW: num('seasonW') });
+  setLog(log);
+};
+$('resetBtn').onclick = () => {
+  FIELDS.forEach(id => set(id, ({weight:50, seasonW:60, edgeThresh:20, precipF:0.95})[id] ?? ''));
+  CHECKS.forEach(id => $(id).checked = false);
+  curId = null; out = new Set(); ['gameInfo','mateInfo','oddsInfo'].forEach(i => $(i).innerHTML = '');
+  ['mateBox','qbSelWrap','bookWrap'].forEach(i => $(i).classList.add('hidden'));
+  $('wxInfo').textContent = 'Load a player to pull the kickoff forecast.';
+  buildCoverageRows(); calc(); saveInputs();
+};
+$('exportBtn').onclick = exportCSV;
+$('clearBtn').onclick = () => { if (confirm('Delete every saved projection?')) setLog([]); };
+
+// ---------------- Init ----------------
+(async function init(){
+  buildCoverageRows();
+  DATA = await loadData();
+  if (DATA && DATA.fits) FITS = DATA.fits;
+  renderStatus();
+  if (DATA) buildPicker();
   loadInputs(); calc(); renderLog();
+})();
 })();
 </script>
 </body>
