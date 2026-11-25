@@ -31,6 +31,11 @@ FIT_START = 2018          # first historical season used for model fits
 QB_SHRINK_ATT = 200       # attempts of "prior" blended into each QB's Y/A
 WIND_BUCKETS = [(0, 10, "0-9 mph"), (10, 15, "10-14 mph"), (15, 20, "15-19 mph"), (20, 99, "20+ mph")]
 DIST_BUCKETS = [(0, 45, "<45"), (45, 70, "45-70"), (70, 999, "70+")]
+ADOT_BUCKETS = [(-99, 8, "short (aDOT <8)"), (8, 12, "mid (aDOT 8-12)"), (12, 99, "deep (aDOT 12+)")]
+CB_POS = {"CB", "CB/R", "DB", "DB/L"}
+S_POS = {"S", "SS", "FS"}
+TEAM_FIX = {"OAK": "LV", "SD": "LAC", "STL": "LA"}
+STATIC_FITS = os.path.join(os.path.dirname(__file__), "..", "data", "fits_static.json")
 ODDS_SPORT = "americanfootball_nfl"
 ODDS_MARKET = "player_reception_yds"
 CREDIT_RESERVE = 25       # stop pulling props when fewer credits than this remain
@@ -69,28 +74,104 @@ def r(x, n=3):
 # Historical fits
 # --------------------------------------------------------------------------------------
 def fit_distribution(hist_ps):
-    """Ratio of actual yards to expected (prior-games mean), WR/TE, normalized so mean = 1."""
+    """Ratio of actual yards to expected (prior-games mean), WR/TE, normalized so mean = 1.
+    Bucketed by expected yards and by player type (prior-games aDOT) -> #12."""
     d = (hist_ps.filter(pl.col("position").is_in(["WR", "TE"]) & (pl.col("season_type") == "REG"))
          .sort(["player_id", "season", "week"])
-         .with_columns([
-             pl.col("receiving_yards").fill_null(0).cast(pl.Float64).alias("y"),
-         ])
+         .with_columns([pl.col("receiving_yards").fill_null(0).cast(pl.Float64).alias("y"),
+                        pl.col("receiving_air_yards").fill_null(0).cast(pl.Float64).alias("ay"),
+                        pl.col("targets").fill_null(0).cast(pl.Float64).alias("t")])
          .with_columns([
              pl.col("y").cum_sum().shift(1).over(["player_id", "season"]).alias("cum"),
              pl.col("y").cum_count().shift(1).over(["player_id", "season"]).alias("n"),
+             pl.col("ay").cum_sum().shift(1).over(["player_id", "season"]).alias("cay"),
+             pl.col("t").cum_sum().shift(1).over(["player_id", "season"]).alias("ct"),
          ])
          .filter(pl.col("n") >= 4)
-         .with_columns((pl.col("cum") / pl.col("n")).alias("exp"))
+         .with_columns([(pl.col("cum") / pl.col("n")).alias("exp"),
+                        pl.when(pl.col("ct") >= 10).then(pl.col("cay") / pl.col("ct")).otherwise(None).alias("adot")])
          .filter(pl.col("exp") >= 20)
          .with_columns((pl.col("y") / pl.col("exp")).alias("ratio")))
-    out = []
-    for lo, hi, label in DIST_BUCKETS:
-        x = d.filter((pl.col("exp") >= lo) & (pl.col("exp") < hi))["ratio"].to_numpy()
+
+    def pack(x, **meta):
         x = x / x.mean()
         q = np.quantile(x, np.linspace(0, 1, 101))
-        out.append({"lo": lo, "hi": hi, "label": label, "n": int(len(x)), "q": [r(v, 4) for v in q]})
-        log(f"dist {label}: n={len(x)} median={q[50]:.3f} P(0 yds)={np.mean(x == 0):.3f}")
+        return {**meta, "n": int(len(x)), "q": [r(v, 4) for v in q]}
+
+    out = []
+    for lo, hi, label in DIST_BUCKETS:
+        mb = d.filter((pl.col("exp") >= lo) & (pl.col("exp") < hi))
+        out.append(pack(mb["ratio"].to_numpy(), lo=lo, hi=hi, label=label, adLo=None, adHi=None, adLabel="all types"))
+        for alo, ahi, alab in ADOT_BUCKETS:
+            x = mb.filter((pl.col("adot") >= alo) & (pl.col("adot") < ahi))["ratio"].to_numpy()
+            if len(x) >= 300:
+                e = pack(x, lo=lo, hi=hi, label=label, adLo=alo, adHi=ahi, adLabel=alab)
+                out.append(e)
+                q = e["q"]
+                log(f"dist {label} {alab}: n={e['n']} median={q[50]:.3f} p10={q[10]:.2f} p90={q[90]:.2f}")
     return out
+
+
+def fit_def_weight(hist_ts):
+    """How much of a defense's season-to-date Y/A-allowed edge carries into the next game.
+    Slope of next-game ratio on prior-games ratio (both vs league), by games of sample."""
+    lg = hist_ts.group_by("season").agg((pl.col("passing_yards").sum() / pl.col("attempts").sum()).alias("lg"))
+    d = (hist_ts.filter(pl.col("season_type") == "REG").join(lg, on="season")
+         .sort(["opponent_team", "season", "week"])
+         .with_columns([
+             pl.col("passing_yards").cast(pl.Float64).cum_sum().shift(1).over(["opponent_team", "season"]).alias("cy"),
+             pl.col("attempts").cast(pl.Float64).cum_sum().shift(1).over(["opponent_team", "season"]).alias("ca"),
+             pl.col("attempts").cum_count().shift(1).over(["opponent_team", "season"]).alias("n")])
+         .filter((pl.col("n") >= 3) & (pl.col("attempts") >= 10))
+         .with_columns([((pl.col("cy") / pl.col("ca")) / pl.col("lg") - 1).alias("x"),
+                        ((pl.col("passing_yards") / pl.col("attempts")) / pl.col("lg") - 1).alias("y")]))
+    out = []
+    for lo, hi in [(0, 6), (6, 10), (10, 99)]:
+        b = d.filter((pl.col("n") >= max(lo, 3)) & (pl.col("n") < hi))
+        x, y, w = b["x"].to_numpy(), b["y"].to_numpy(), b["attempts"].to_numpy()
+        slope = float(np.sum(w * x * y) / np.sum(w * x * x))
+        out.append({"minG": lo, "maxG": hi - 1, "w": r(slope), "n": int(len(x))})
+        log(f"defense weight games {lo}-{hi - 1}: {slope:.3f} (n={len(x)})")
+    return out
+
+
+def fit_db_injuries(hist_snaps, hist_ts):
+    """Effect on opponent passing Y/A when a starting CB or S misses a game (#10)."""
+    sn = (hist_snaps.filter(pl.col("game_type") == "REG")
+          .with_columns(pl.col("team").replace(TEAM_FIX))
+          .with_columns(pl.when(pl.col("position").is_in(list(CB_POS))).then(pl.lit("CB"))
+                        .when(pl.col("position").is_in(list(S_POS))).then(pl.lit("S")).otherwise(None).alias("grp"))
+          .filter(pl.col("grp").is_not_null()))
+    played = sn.filter(pl.col("defense_snaps") > 0)
+    starters = (played.group_by(["pfr_player_id", "season", "team", "grp"])
+                .agg([pl.len().alias("gp"), pl.col("defense_pct").mean().alias("pct"),
+                      pl.col("week").min().alias("w0"), pl.col("week").max().alias("w1")])
+                .filter((pl.col("gp") >= 6) & (pl.col("pct") >= 0.6)))
+    tg = hist_ts.filter(pl.col("season_type") == "REG").select(
+        ["season", "week", pl.col("opponent_team").alias("team")]).unique()  # weeks each defense played
+    exp_ = starters.join(tg, on=["season", "team"]).filter((pl.col("week") >= pl.col("w0")) & (pl.col("week") <= pl.col("w1")))
+    miss = (exp_.join(played.select(["pfr_player_id", "season", "week"]).with_columns(pl.lit(1).alias("p")),
+                      on=["pfr_player_id", "season", "week"], how="left")
+            .filter(pl.col("p").is_null())
+            .group_by(["season", "week", "team"]).agg([
+                (pl.col("grp") == "CB").sum().alias("mCB"), (pl.col("grp") == "S").sum().alias("mS")]))
+    t = hist_ts.filter(pl.col("season_type") == "REG")
+    lg = t.group_by("season").agg((pl.col("passing_yards").sum() / pl.col("attempts").sum()).alias("lg"))
+    dya = t.group_by(["season", "opponent_team"]).agg((pl.col("passing_yards").sum() / pl.col("attempts").sum()).alias("dya"))
+    oya = t.group_by(["season", "team"]).agg((pl.col("passing_yards").sum() / pl.col("attempts").sum()).alias("oya"))
+    d = (t.filter(pl.col("attempts") >= 10).join(lg, on="season").join(dya, on=["season", "opponent_team"])
+         .join(oya, on=["season", "team"])
+         .join(miss.rename({"team": "opponent_team"}), on=["season", "week", "opponent_team"], how="left")
+         .with_columns([pl.col("mCB").fill_null(0), pl.col("mS").fill_null(0),
+                        ((pl.col("passing_yards") / pl.col("attempts")) / (pl.col("dya") * pl.col("oya") / pl.col("lg"))).log().alias("y")]))
+    X = np.column_stack([np.ones(d.height), d["mCB"].to_numpy(), d["mS"].to_numpy()])
+    w = d["attempts"].to_numpy().astype(float)
+    W = np.sqrt(w)
+    b, *_ = np.linalg.lstsq(X * W[:, None], d["y"].to_numpy() * W, rcond=None)
+    res = {"cb": r(np.exp(b[1]), 4), "s": r(np.exp(b[2]), 4), "n": int(d.height),
+           "gamesMissingCB": int((d["mCB"] > 0).sum()), "gamesMissingS": int((d["mS"] > 0).sum())}
+    log(f"DB injuries: per missing starting CB x{res['cb']}, per S x{res['s']} (n={res['n']})")
+    return res
 
 
 def team_games(hist_ts, hist_sched):
@@ -246,25 +327,47 @@ def main():
     except Exception as e:  # injuries can lag early in the week
         log("injuries unavailable:", e)
 
-    # ---- pass catchers (all positions with targets; WR/TE selectable)
-    tt = ts.select(["game_id", "team", pl.col("targets").alias("team_tgt")])
-    pc = (ps.filter((pl.col("targets").fill_null(0) > 0) | pl.col("position").is_in(["WR", "TE"]))
-            .join(tt, on=["game_id", "team"], how="left")
-            .sort(["player_id", "week"]))
+    # ---- games played from snap counts (so 0-catch games count), dropbacks from play-by-play
+    idmap = nfl.load_players().select(["gsis_id", "pfr_id"]).drop_nulls()
+    snaps = nfl.load_snap_counts(season).filter(pl.col("game_type").is_in(["REG", "WC", "DIV", "CON", "SB"]))
+    pbp = nfl.load_pbp(season).filter(pl.col("season_type").is_in(["REG", "POST"]))
+    dbk = (pbp.filter(pl.col("posteam").is_not_null()).group_by(["game_id", "posteam"])
+              .agg(pl.col("qb_dropback").fill_null(0).sum().alias("team_db")).rename({"posteam": "team"}))
+    for t in dbk.group_by("team").agg(pl.col("team_db").mean()).iter_rows(named=True):
+        if t["team"] in teams:
+            teams[t["team"]]["dbPg"] = r(t["team_db"], 1)
+    sched_wk = sched.select(["game_id", "week", "home_team", "away_team"])
+    snap_games = (snaps.filter(pl.col("offense_snaps") > 0)
+                  .join(idmap, left_on="pfr_player_id", right_on="pfr_id")
+                  .select([pl.col("gsis_id").alias("player_id"), "game_id", "team"]))
+    stat_games = ps.select(["player_id", "game_id", "team"])
+    pg = (pl.concat([stat_games, snap_games], how="vertical_relaxed").unique(["player_id", "game_id"], keep="first")
+          .join(ps.select(["player_id", "game_id", "targets", "receiving_yards", "receiving_air_yards"]),
+                on=["player_id", "game_id"], how="left")
+          .join(ts.select(["game_id", "team", pl.col("targets").alias("team_tgt")]), on=["game_id", "team"], how="left")
+          .join(dbk, on=["game_id", "team"], how="left")
+          .join(sched_wk, on="game_id", how="left")
+          .with_columns(pl.when(pl.col("team") == pl.col("home_team")).then(pl.col("away_team"))
+                        .otherwise(pl.col("home_team")).alias("opp"))
+          .with_columns([pl.col(c).fill_null(0) for c in ["targets", "receiving_yards", "receiving_air_yards", "team_tgt", "team_db"]])
+          .sort(["player_id", "week"]))
+    meta = (ps.sort("week").group_by("player_id").agg([pl.col("player_display_name").last(), pl.col("position").last(),
+                                                       pl.col("targets").fill_null(0).sum().alias("tot_tgt")]))
+    meta = {m["player_id"]: m for m in meta.iter_rows(named=True)
+            if m["position"] in ("WR", "TE") or m["tot_tgt"] > 0}
     players = {}
-    for (pid,), grp in pc.group_by(["player_id"]):
+    for (pid,), grp in pg.filter(pl.col("player_id").is_in(list(meta))).group_by(["player_id"]):
         grp = grp.sort("week")
-        last = grp.tail(1).row(0, named=True)
-        l4 = grp.tail(4)
-        tg, ttg = grp["targets"].fill_null(0).sum(), grp["team_tgt"].fill_null(0).sum()
-        l4tg, l4ttg = l4["targets"].fill_null(0).sum(), l4["team_tgt"].fill_null(0).sum()
+        m, last, l4 = meta[pid], grp.tail(1).row(0, named=True), grp.tail(4)
+        tg, ttg = grp["targets"].sum(), grp["team_tgt"].sum()
+        l4tg, l4ttg = l4["targets"].sum(), l4["team_tgt"].sum()
         p = {
-            "name": last["player_display_name"], "pos": last["position"], "team": last["team"],
-            "g": grp.height, "ypg": r(grp["receiving_yards"].fill_null(0).mean(), 1),
-            "l4ypg": r(l4["receiving_yards"].fill_null(0).mean(), 1),
+            "name": m["player_display_name"], "pos": m["position"], "team": last["team"],
+            "g": grp.height, "ypg": r(grp["receiving_yards"].mean(), 1), "l4ypg": r(l4["receiving_yards"].mean(), 1),
             "ts": r(tg / ttg * 100 if ttg else 0, 1), "l4ts": r(l4tg / l4ttg * 100 if l4ttg else 0, 1),
-            "tgtPg": r(tg / grp.height, 1), "status": status.get(pid),
-            "log": [[int(x["week"]), x["opponent_team"], int(x["targets"] or 0), int(x["receiving_yards"] or 0)]
+            "tgtPg": r(tg / grp.height, 1), "adot": r(grp["receiving_air_yards"].sum() / tg, 1) if tg >= 5 else None,
+            "teamDb": int(grp["team_db"].sum()), "status": status.get(pid),
+            "log": [[int(x["week"]), x["opp"], int(x["targets"]), int(x["receiving_yards"])]
                     for x in grp.tail(6).iter_rows(named=True)],
         }
         players[pid] = p
@@ -275,6 +378,21 @@ def main():
         t["catchers"] = sorted(t.get("catchers", []), key=lambda c: -c["ts"])[:12]
     log(f"players: {len(players)}")
 
+    # ---- defensive starters (CB/S) with injury status (#10)
+    pfr2gsis = {x["pfr_id"]: x["gsis_id"] for x in idmap.iter_rows(named=True)}
+    dsn = (snaps.with_columns(pl.when(pl.col("position").is_in(list(CB_POS))).then(pl.lit("CB"))
+                              .when(pl.col("position").is_in(list(S_POS))).then(pl.lit("S")).otherwise(None).alias("grp"))
+           .filter(pl.col("grp").is_not_null() & (pl.col("defense_snaps") > 0)))
+    team_games_n = {t: v["g"] for t, v in teams.items()}
+    dstat = (dsn.group_by(["pfr_player_id", "player", "team", "grp"])
+             .agg([pl.len().alias("gp"), pl.col("defense_pct").mean().alias("pct"), pl.col("week").max().alias("lastwk")])
+             .filter((pl.col("gp") >= 2) & (pl.col("pct") >= 0.5)).sort("pct", descending=True))
+    for t in teams:
+        rows = dstat.filter(pl.col("team") == t).head(7)
+        teams[t]["dbs"] = [{"name": x["player"], "pos": x["grp"], "pct": r(x["pct"] * 100, 0), "gp": x["gp"],
+                            "missed": max(0, team_games_n.get(t, x["gp"]) - x["gp"]),
+                            "status": status.get(pfr2gsis.get(x["pfr_player_id"]))} for x in rows.iter_rows(named=True)]
+
     # ---- historical data for fits
     hist_seasons = list(range(FIT_START, season))
     hist_ps = nfl.load_player_stats(hist_seasons)
@@ -282,8 +400,12 @@ def main():
     hist_sched = nfl.load_schedules(hist_seasons)
     g = team_games(hist_ts, hist_sched)
     qb_prior = fit_qb_prior(hist_ps)
+    hist_snaps = nfl.load_snap_counts(hist_seasons)
     fits = {"dist": fit_distribution(hist_ps), "passAtt": fit_pass_attempts(g), "wind": fit_wind(g),
-            "qbPrior": qb_prior, "seasons": f"{FIT_START}-{season - 1}"}
+            "qbPrior": qb_prior, "defWeight": fit_def_weight(hist_ts), "dbInj": fit_db_injuries(hist_snaps, hist_ts),
+            "seasons": f"{FIT_START}-{season - 1}"}
+    if os.path.exists(STATIC_FITS):   # coverage-split shrinkage (#3), fitted once by fit_split_reliability.py
+        fits.update(json.load(open(STATIC_FITS)))
 
     # ---- QBs: roster QBs, Y/A over last 3 seasons shrunk toward backup prior
     q3 = (pl.concat([hist_ps.filter(pl.col("season") >= season - 2).select(ps.columns), ps], how="vertical_relaxed")
@@ -348,4 +470,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-
