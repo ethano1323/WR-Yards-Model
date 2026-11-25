@@ -176,7 +176,9 @@
       <button type="button" data-mode="detailed">Cover 0–6</button>
     </div>
     <span class="hint" style="margin-bottom:10px"><b>Both</b> uses man/zone and single/two-high together. Each view's effect is weighted by how far this defense is from league average on it, measured in standard deviations.
-      Enter one rate per pair and the other auto-fills (zone = 100 − man). Enter total routes plus routes vs. one split and the other split's routes auto-fill.
+      Enter one rate per pair and the other auto-fills (zone = 100 − man).
+      <b>Routes vs. each coverage are optional:</b> leave them blank and the model estimates them as total routes × the league coverage mix (shown in grey as ~number).
+      It uses your own entered defenses' average once you've entered 16+ this week.
       Coverage rates are remembered per opponent each week, and splits/routes per player.</span>
     <table>
       <thead><tr><th>Coverage</th><th class="num">Def. rate %</th><th class="num">YPRR vs.</th><th class="num">Routes vs.</th><th class="num">Split weight</th></tr></thead>
@@ -433,7 +435,15 @@ function kList(m, mult){
   const ss = FITS && FITS.splitShrink, fb = { man:608, zone:773, single:2044, two:2552 };
   return SHRINK_KEYS[m].map(key => ((key && ss && ss[key] && ss[key].k) || (key && fb[key]) || NOSIG_K) * mult);
 }
-function covShares(m){ const ss = FITS && FITS.splitShrink; return ss && ss.shares ? ss.shares[m] : null; }
+// Coverage mix used to estimate routes vs. each coverage from total routes:
+// the average of YOUR entered defenses this week (16+ entered), otherwise the 2023-25 FTN league average.
+function covShares(m){
+  const ss = FITS && FITS.splitShrink, hist = ss && ss.shares ? ss.shares[m] : null;
+  if (m === 'detailed' || !DATA) return hist;
+  const wk = String(DATA.meta.week), mm = mem(), acc = [];
+  Object.keys(mm).forEach(k => { const q = k.split('|'); if (q[0] === 'cov' && q[1] === wk && q[3] === m){ const r = normRates(mm[k].map(pnum)); if (r) acc.push(r); } });
+  return acc.length >= 16 ? acc[0].map((_, i) => acc.reduce((a, r) => a + r[i], 0) / acc.length) : hist;
+}
 function byGames(list, g, fallback){ if (!list) return fallback; return list.find(f => g >= f.minG && g <= f.maxG) || list[list.length-1]; }
 function defWeight(g){ const b = byGames(FITS && FITS.defWeight, g ?? 10, null); return b ? Math.max(0, b.w) : 0.2; }
 function attModel(avg, total, spread, g){
@@ -952,7 +962,11 @@ function render(r){
   $('outErrors').innerHTML = (r.errors || []).map(e => `<li>${esc(e)}</li>`).join('');
   MODES[mode].forEach(dim => {
     const d = r.cov && r.cov.dims ? r.cov.dims.find(x => x.dim === dim) : null;
-    COVERAGES[dim].forEach((_, i) => { const el = $(`cw-${dim}-${i}`); if (el) el.textContent = d && d.rows[i] ? Math.round(d.rows[i].wt*100) + '%' : '—'; });
+    COVERAGES[dim].forEach((_, i) => {
+      const el = $(`cw-${dim}-${i}`); if (el) el.textContent = d && d.rows[i] ? Math.round(d.rows[i].wt*100) + '%' : '—';
+      const ri = document.querySelector(`.covRoutes[data-dim="${dim}"][data-i="${i}"]`);
+      if (ri) ri.placeholder = d && d.rows[i] && d.rows[i].n != null && d.rows[i].n > 0 ? `~${Math.round(d.rows[i].n)}` : 'routes';
+    });
     const h = $('cdw-' + dim);
     if (h) h.innerHTML = d && d.league ? `· blend weight <b>${Math.round(d.w*100)}%</b>. This defense's ${DIM_SHARE[dim]} is ${pct(d.share)} vs league ${pct(d.league.mean)} (${sgn(d.z)}${f1(d.z)} SD)` : '';
   });
@@ -966,7 +980,7 @@ function render(r){
   $('outFair').textContent = r.fair != null ? f1(r.fair) : '—';
   $('outMethods').innerHTML = r.m2 != null ? `YPG method <b>${f1(r.m1)}</b> · Route method <b>${f1(r.m2)}</b> · blend ${Math.round((1-r.rw)*100)}/${Math.round(r.rw*100)}`
     : 'YPG method only. Enter total routes (box 2) to add the route method.';
-  const mName = { routes:'shrunk by routes per split', estimated:'split routes estimated from total routes', legacy:'fallback weight, no route counts', none:'no splits entered' };
+  const mName = { routes:'shrunk by routes per split', estimated:'routes per coverage estimated from total routes × league mix', legacy:'fallback weight, no route counts', none:'no splits entered' };
   const dimTxt = r.cov.dims.map(d => `${DIM_LABEL[d.dim]} ×${f3(d.f)} (${mName[d.method]}${r.cov.dims.length > 1 ? `, ${Math.round(d.w*100)}% of blend` : ''})`).join(' · ');
   const lgSrc = r.cov.dims.length > 1 && r.cov.dims[0].league ? `<br><span class="sub">League baseline: ${esc(r.cov.dims[0].league.src)}.</span>` : '';
   $('covInfo').innerHTML = (r.rt ? `Route participation <b>${pct(r.rt.rp)}</b> (${I.routesTotal} routes ÷ ${I.teamDb} team dropbacks in his games) → projected <b>${f1(r.rt.projRoutes)}</b> routes on ${f1(r.rt.projDb)} dropbacks.<br>` : '') +
@@ -1193,6 +1207,10 @@ function computeRow(pid){
   const tr = $('sr-' + pid);
   if (!slRes[pid]){ ['o-mean','o-fair','o-p','o-side','o-ev'].forEach(k => c(k, '—')); c('o-ftn', S.I.line == null ? '<span class="muted">no line</span>' : '—'); if (tr) tr.classList.remove('pos'); return; }
   const x = slRes[pid];
+  (x.cov.dims || []).forEach(dd => COVERAGES[dd.dim].forEach((_, i) => {
+    const el = document.querySelector(`.s-split[data-pid="${pid}"][data-dim="${dd.dim}"][data-i="${i}"][data-kind="r"]`);
+    if (el) el.placeholder = dd.rows[i] && dd.rows[i].n > 0 ? `~${Math.round(dd.rows[i].n)}` : '';
+  }));
   c('o-mean', f1(x.mean)); c('o-fair', x.fair != null ? f1(x.fair) : '—'); c('o-p', x.pOver != null ? pct(x.pOver) : '—');
   c('o-side', x.side ? `<b class="ok">${x.side.toUpperCase()}</b>` : '<span class="muted">—</span>');
   c('o-ev', `<span class="${x.bestEV > 0 ? 'ok' : 'bad'}">${sgn(x.bestEV)}${f1(x.bestEV)}</span>${x.flag ? ' ⚠' : ''}`);

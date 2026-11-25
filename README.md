@@ -42,7 +42,9 @@ Fair line, P(Over) = historical outcome distribution by mean AND player type (aD
 
 **Coverage weighting rule** (applies within each view):
 1. If you entered routes for each split, those routes are used.
-2. If you only entered total routes, routes per split are estimated from the league coverage mix (41% man / 59% zone, 58% single-high / 42% two-high).
+2. If you only entered total routes (the usual case), routes vs. each coverage = total routes × the league coverage mix. The estimates show in grey (~number) in the routes boxes.
+   - The mix is the average of your own entered defenses once 16+ are entered that week; otherwise the 2023–25 FTN average (41% man / 59% zone, 58% single-high / 42% two-high).
+   - It uses the league mix, not this week's opponent, because a player's routes so far came against the defenses he has already faced.
 3. If you entered no routes at all, the fallback weight (25%) is used.
 
 ## What the data says (fits refresh each run; split reliability fitted once)
