@@ -71,6 +71,18 @@ scripts/fit_split_reliability.py    (one-time fit; the workflow doesn't run it)
 .github/workflows/update-data.yml
 ```
 
+## Injury handling
+
+- **Statuses treated as out:** **IR** (all reserve lists: IR, PUP, NFI, suspended), **Released**, **Out** and **Doubtful**.
+  - IR and released come from the nflverse roster, because IR players never appear on the weekly injury report.
+  - Out and Doubtful come from the injury report.
+  - **Questionable** is shown with a badge but left unchecked for you to decide.
+- **Hidden by default** from the player picker and the slate. Tick "Also show IR / Out / Doubtful players" to see them.
+- **Pre-checked as OUT** in teammates, the opponent's secondary, and the QB choice.
+- **No double counting:** only the part of an out player's targets that teammates' stats don't already reflect is redistributed.
+  - Formula: redistributed = share × (1 − [season weight × games missed ÷ team games + recent weight × last-4 games missed ÷ 4]).
+  - Example: with Puka Nacua, Davante Adams and Terrance Ferguson on IR, Tyler Higbee goes from 11.7% to 18.1%, not 35.8%.
+
 ## Slate tab tools
 
 | Tool | Where | What it does |

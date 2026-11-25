@@ -70,7 +70,7 @@
   .stats{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0;font-size:.86rem}
   .stats b{font-variant-numeric:tabular-nums}
   .badge{display:inline-block;font-size:.68rem;font-weight:700;padding:1px 6px;border-radius:9px;margin-left:4px}
-  .b-Out,.b-Doubtful{background:var(--bad);color:#fff} .b-Questionable{background:var(--warn);color:#fff}
+  .b-Out,.b-Doubtful,.b-IR,.b-Released{background:var(--bad);color:#fff} .b-Questionable{background:var(--warn);color:#fff}
   .info{font-size:.82rem;color:var(--muted);margin-top:8px}
   .formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.74rem;color:var(--muted);
        background:var(--bg);padding:8px;border-radius:6px;margin-top:10px;white-space:pre-wrap}
@@ -204,8 +204,8 @@
     <span class="hint" style="margin-top:6px">How much weight recent games get is set in Settings (top of page).</span>
     <div id="mateBox" class="hidden" style="margin-top:12px">
       <label>Teammates: check anyone who is OUT. Their targets are redistributed proportionally.</label>
-      <span class="hint" style="margin-bottom:6px">Players listed Out or Doubtful are pre-checked. Proportional redistribution can overstate an alpha's gain when a big share is vacated, so trim it if it looks too high.</span>
-      <table><thead><tr><th>Out</th><th>Player</th><th class="num">Season</th><th class="num">L4</th><th class="num">Blend</th></tr></thead>
+      <span class="hint" style="margin-bottom:6px">Players on IR or listed Out/Doubtful are pre-checked. Only the part of an out player's share that isn't already in teammates' stats gets redistributed (e.g., if he has missed the last 4 games, teammates' recent numbers already include most of the boost).</span>
+      <table><thead><tr><th>Out</th><th>Player</th><th class="num">Season</th><th class="num">L4</th><th class="num">Blend</th><th class="num">Missed (last 4)</th></tr></thead>
       <tbody id="mateBody"></tbody></table>
       <div class="info" id="mateInfo"></div>
     </div>
@@ -312,6 +312,7 @@ Mean         = blend of the two · Fair line = Mean × historical median ratio</
     <div class="inline">
       <div><label for="slMinYpg">Min season YPG</label><input id="slMinYpg" type="number" value="25" step="5" min="0"></div>
       <div><label><input id="slLineOnly" type="checkbox" checked>Only players with a line</label></div>
+      <div><label><input id="slShowInj" type="checkbox">Also show IR / Out / Doubtful players</label></div>
       <div><label for="slSearch">Search</label><input id="slSearch" type="text" placeholder="name or team"></div>
       <div><label>Coverage view</label><div class="sub" id="slMode"></div></div>
     </div>
@@ -335,7 +336,7 @@ Mean         = blend of the two · Fair line = Mean × historical median ratio</
 
   <details class="card full" id="ctxCard" open>
     <summary>Game context: injuries, quarterbacks, weather &amp; pass volume</summary>
-    <span class="hint">Filled in automatically: players listed Out or Doubtful are checked, the expected QB is selected, and weather comes from the kickoff forecast.
+    <span class="hint">Filled in automatically: players on IR or listed Out/Doubtful are checked, the expected QB is selected, and weather comes from the kickoff forecast.
       Anything you change here also applies in Single player view, and vice versa. Games are shown for the teams you picked above.</span>
     <div id="ctxBody"></div>
   </details>
@@ -695,9 +696,9 @@ function renderStatus(){
     (o.creditsRemaining != null && +o.creditsRemaining < 50 ? ' · <span class="warn">credits low: use "My own line" until they reset on the 1st</span>' : '');
 }
 function teamsThisWeek(){ const s = new Set(); (DATA.games||[]).forEach(g => { s.add(g.home); s.add(g.away); }); return s; }
-function slatePlayers(){
+function slatePlayers(showInjured = false){
   const playing = teamsThisWeek();
-  let list = Object.entries(DATA.players).filter(([,p]) => (p.pos === 'WR' || p.pos === 'TE') && p.g >= 1);
+  let list = Object.entries(DATA.players).filter(([,p]) => (p.pos === 'WR' || p.pos === 'TE') && p.g >= 1 && (showInjured || !isOut(p.status)));
   const on = list.filter(([,p]) => playing.has(p.team)); if (on.length) list = on;
   return list.sort((a,b) => b[1].ypg - a[1].ypg);
 }
@@ -709,13 +710,15 @@ function buildPicker(){
 const gameFor = team => (DATA.games||[]).find(g => g.home === team || g.away === team);
 
 // ---------- player loading ----------
-function defaultOut(t, id){ return new Set((t.catchers||[]).filter(c => c.id !== id && (c.status === 'Out' || c.status === 'Doubtful')).map(c => c.id)); }
+const OUT_STATUS = new Set(['IR', 'Released', 'Out', 'Doubtful']);
+const isOut = st => OUT_STATUS.has(st);
+function defaultOut(t, id){ return new Set((t.catchers||[]).filter(c => c.id !== id && isOut(c.status)).map(c => c.id)); }
 const dbId = d => `${d.name}|${d.pos}`;
-function defaultDbOut(ot){ return new Set(((ot && ot.dbs) || []).filter(d => d.status === 'Out' || d.status === 'Doubtful').map(dbId)); }
+function defaultDbOut(ot){ return new Set(((ot && ot.dbs) || []).filter(d => isOut(d.status)).map(dbId)); }
 function defaultQB(t){
   const qbs = t.qbs || []; if (!qbs.length) return null;
-  const inc = qbs.find(q => q.incumbent) || qbs[0], healthy = qbs.filter(q => q.status !== 'Out' && q.status !== 'Doubtful');
-  return { inc, starter: (inc.status === 'Out' || inc.status === 'Doubtful') && healthy.length ? healthy[0] : inc };
+  const inc = qbs.find(q => q.incumbent) || qbs[0], healthy = qbs.filter(q => !isOut(q.status));
+  return { inc, starter: isOut(inc.status) && healthy.length ? healthy[0] : inc };
 }
 function loadPlayer(id, fill = true){
   const p = DATA.players[id]; if (!p) return;
@@ -733,7 +736,7 @@ function loadPlayer(id, fill = true){
     recallDetail(true);
   }
   if (g){
-    const st = p.status ? ` <span class="badge b-${esc(p.status)}">${esc(p.name)}: ${esc(p.status)}</span>` : '';
+    const st = p.status ? ` <span class="badge b-${esc(p.status)}">${esc(p.name)}: ${esc(p.status)}</span>${isOut(p.status) ? ' <span class="bad">Not expected to play.</span>' : ''}` : '';
     const sp = num('spread');
     $('gameInfo').innerHTML = `<b>${esc(p.team)}</b> ${home ? 'vs' : '@'} <b>${esc(opp)}</b> · ${esc(g.gameday)} ${esc(g.gametime)} ET · ` +
       `${sp == null ? 'spread n/a' : (sp > 0 ? 'favored by ' + sp : sp < 0 ? 'underdog by ' + (-sp) : "pick'em")} · total ${gameLines(g).total ?? 'n/a'}${st}` +
@@ -754,18 +757,29 @@ function renderMates(){
   $('mateBody').innerHTML = t.catchers.filter(c => c.id !== curId).map(c => `
     <tr><td><input type="checkbox" class="mateOut" data-id="${esc(c.id)}" ${out.has(c.id) ? 'checked' : ''}></td>
       <td>${esc(c.name)} <span class="muted">${esc(c.pos)}</span>${c.status ? `<span class="badge b-${esc(c.status)}">${esc(c.status)}</span>` : ''}</td>
-      <td class="num">${f1(c.ts)}%</td><td class="num">${f1(c.l4ts)}%</td><td class="num">${f1(blendTS(c.ts, c.l4ts, ws))}%</td></tr>`).join('');
+      <td class="num">${f1(c.ts)}%</td><td class="num">${f1(c.l4ts)}%</td><td class="num">${f1(blendTS(c.ts, c.l4ts, ws))}%</td>
+      <td class="num">${c.missed ? `${c.missed} g (${c.missedL4 || 0})` : '—'}</td></tr>`).join('');
+}
+// Share of an absent player's targets NOT already reflected in teammates' stats.
+// Teammates' season share already includes the games he missed (missed ÷ team games), and their
+// last-4 share includes the recent games he missed (missedL4 ÷ 4). Only the remainder is redistributed.
+function stillToRedistribute(c, teamG, ws){
+  const a = teamG ? Math.min(1, (c.missed || 0) / teamG) : 0, k = Math.min(4, c.missedL4 || 0) / 4;
+  return Math.max(0, 1 - (ws*a + (1-ws)*k));
 }
 function redistribute(p, t, outSet, sTS, lTS, ws){
   const base = blendTS(sTS ?? p.ts, lTS, ws);
-  const vac = (t.catchers||[]).filter(c => outSet.has(c.id)).reduce((a,c) => a + blendTS(c.ts, c.l4ts, ws), 0);
-  return { base, vac, proj: vac < 100 ? base/(1 - vac/100) : base };
+  let full = 0, vac = 0;
+  (t.catchers||[]).filter(c => outSet.has(c.id)).forEach(c => { const sh = blendTS(c.ts, c.l4ts, ws); full += sh; vac += sh * stillToRedistribute(c, t.g, ws); });
+  return { base, vac, full, proj: vac < 100 ? base/(1 - vac/100) : base };
 }
 function recomputeTS(){
   const p = curId && DATA && DATA.players[curId], t = p && DATA.teams[p.team]; if (!t) return;
   const r = redistribute(p, t, out, num('seasonTS'), num('l4TS'), settings().ws);
   set('projTS', +r.proj.toFixed(1));
-  $('mateInfo').textContent = r.vac > 0 ? `Vacated: ${f1(r.vac)}% of team targets → ${p.name}'s share rises from ${f1(r.base)}% to ${f1(r.proj)}%.` : 'No teammates marked out.';
+  $('mateInfo').textContent = r.full > 0
+    ? `Out players normally draw ${f1(r.full)}% of targets. ${f1(r.full - r.vac)}% of that is already reflected in teammates' stats (games they've already missed), so ${f1(r.vac)}% is redistributed → ${p.name}'s share goes from ${f1(r.base)}% to ${f1(r.proj)}%.`
+    : 'No teammates marked out.';
 }
 
 // ---------- #10 defenders ----------
@@ -1037,7 +1051,7 @@ function slateInputs(pid){
 }
 function slateList(){
   const minY = num('slMinYpg') ?? 0, q = $('slSearch').value.trim().toLowerCase(), lineOnly = $('slLineOnly').checked;
-  return slatePlayers().map(([id]) => id).filter(id => {
+  return slatePlayers($('slShowInj').checked).map(([id]) => id).filter(id => {
     const p = DATA.players[id];
     if (slTeams.size && !slTeams.has(p.team)) return false;
     if (p.ypg < minY) return false;
@@ -1068,13 +1082,13 @@ function ctxHeader(g){
 function ctxTeamHTML(g, team){
   const t = DATA.teams[team] || {}, outS = teamOut(team, null), dbS = secondaryOut(team), tq = teamQB(team), pa = teamProjAtt(team, g), ws = settings().ws;
   const qb = tq ? `<select class="cx-qb" data-team="${esc(team)}">${(t.qbs || []).map(q => `<option value="${esc(q.id)}"${q.id === tq.starter.id ? ' selected' : ''}>${esc(q.name)}${q.incumbent ? ' (usual starter)' : ''} · ${f2(q.ya)} Y/A${q.status ? ' · ' + esc(q.status) : ''}</option>`).join('')}</select>` : '<span class="sub">n/a</span>';
-  const mates = (t.catchers || []).map(c => `<label><input type="checkbox" class="cx-out" data-team="${esc(team)}" data-id="${esc(c.id)}"${outS.has(c.id) ? ' checked' : ''}>${esc(c.name)}&nbsp;<span class="muted">${esc(c.pos)} ${f1(blendTS(c.ts, c.l4ts, ws))}%</span>${badge(c.status)}</label>`).join('') || '<span class="sub">n/a</span>';
+  const mates = (t.catchers || []).map(c => `<label><input type="checkbox" class="cx-out" data-team="${esc(team)}" data-id="${esc(c.id)}"${outS.has(c.id) ? ' checked' : ''}>${esc(c.name)}&nbsp;<span class="muted">${esc(c.pos)} ${f1(blendTS(c.ts, c.l4ts, ws))}%${c.missed ? ` [${c.missed}g]` : ''}</span>${badge(c.status)}</label>`).join('') || '<span class="sub">n/a</span>';
   const dbs = (t.dbs || []).map(d => `<label><input type="checkbox" class="cx-db" data-team="${esc(team)}" data-id="${esc(dbId(d))}"${dbS.has(dbId(d)) ? ' checked' : ''}>${esc(d.name)}&nbsp;<span class="muted">${esc(d.pos)} ${d.pct}% snaps</span>${badge(d.status)}</label>`).join('') || '<span class="sub">n/a</span>';
   return `<div class="ctxTeam"><div class="ctxH">${esc(team)} offense</div>
     <label class="lbl">Starting QB</label>${qb}
     <label class="lbl">Projected pass attempts <span class="sub">(automatic: <span id="cxa-${esc(team)}">${pa.auto != null ? f1(pa.auto) : 'n/a'}</span>, type a number to override)</span></label>
     <input class="cx-att" data-team="${esc(team)}" type="number" step="0.5" value="${pa.edited ? esc(+(+pa.v).toFixed(1)) : ''}" placeholder="${pa.auto != null ? f1(pa.auto) : ''}">
-    <label class="lbl">Pass catchers OUT <span class="sub">(their targets are shared out to teammates; % = target share)</span></label><div class="ctxList">${mates}</div>
+    <label class="lbl">Pass catchers OUT <span class="sub">(% = target share; games missed so far in brackets. Only the part not already in teammates' stats is redistributed)</span></label><div class="ctxList">${mates}</div>
     <div class="ctxH" style="margin-top:10px">${esc(team)} secondary OUT <span class="sub" style="font-weight:400">(helps ${esc(oppOf(g, team))}'s receivers)</span></div><div class="ctxList">${dbs}</div></div>`;
 }
 function ctxGameHTML(g, open){
@@ -1345,7 +1359,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (SETTINGS_INPUTS.has(t.id)) return;                     // handled on "input"
   if (inSlate(t)){
-    if (t.id === 'slLineOnly'){ renderSlate(); sortSlate(); return; }
+    if (t.id === 'slLineOnly' || t.id === 'slShowInj'){ renderSlate(); sortSlate(); return; }
     if (t.classList.contains('p-book')){ const p = DATA.players[t.dataset.pid]; povrSet(p.name, { book: t.value }); computeRow(t.dataset.pid); return; }
     if (isToggle(t)) ctxInput(t);
     return;
