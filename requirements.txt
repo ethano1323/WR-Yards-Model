@@ -1,4 +1,4 @@
-nflreadpy>=0.1
-polars
-numpy
-requests
+nflreadpy==0.1.5
+polars==2.2.0
+numpy==2.5.3
+requests==2.34.2

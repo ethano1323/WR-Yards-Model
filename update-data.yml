@@ -27,10 +27,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check repo layout
+        run: |
+          missing=0
+          for f in requirements.txt scripts/build_data.py index.html; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Missing '$f' at the top level of the repo. Upload it (keep the folder name for scripts/)."
+              missing=1
+            fi
+          done
+          echo "Files found in repo:"; find . -path ./.git -prune -o -type f -print | sort
+          exit $missing
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: "3.13"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -48,7 +59,12 @@ jobs:
           git add data/data.json
           if git diff --staged --quiet; then
             echo "No data changes."
-          else
-            git commit -m "Update model data $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
+            exit 0
           fi
+          git commit -m "Update model data $(date -u +'%Y-%m-%d %H:%M UTC')"
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            echo "Push attempt $i failed, retrying..."; sleep 5
+          done
+          echo "::error::Could not push data. Check Settings > Actions > General > Workflow permissions = 'Read and write permissions'."
+          exit 1
