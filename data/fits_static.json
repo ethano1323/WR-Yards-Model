@@ -1,0 +1,104 @@
+{
+ "splitShrink": {
+  "man": {
+   "r_half": 0.135,
+   "routes_per_half": 94.7,
+   "k": 608,
+   "players": 244
+  },
+  "zone": {
+   "r_half": 0.151,
+   "routes_per_half": 137.3,
+   "k": 773,
+   "players": 244
+  },
+  "single": {
+   "r_half": 0.059,
+   "routes_per_half": 128.3,
+   "k": 2044,
+   "players": 233
+  },
+  "two": {
+   "r_half": 0.036,
+   "routes_per_half": 94.9,
+   "k": 2552,
+   "players": 233
+  },
+  "COVER_0": {
+   "r_half": -0.203,
+   "routes_per_half": 11.8,
+   "k": null,
+   "players": 90
+  },
+  "COVER_1": {
+   "r_half": 0.105,
+   "routes_per_half": 71.4,
+   "k": 609,
+   "players": 244
+  },
+  "COVER_2": {
+   "r_half": 0.066,
+   "routes_per_half": 45.3,
+   "k": 645,
+   "players": 244
+  },
+  "2_MAN": {
+   "r_half": -0.02,
+   "routes_per_half": 17.5,
+   "k": null,
+   "players": 193
+  },
+  "COVER_3": {
+   "r_half": -0.035,
+   "routes_per_half": 46.4,
+   "k": null,
+   "players": 244
+  },
+  "COVER_4": {
+   "r_half": 0.046,
+   "routes_per_half": 23.3,
+   "k": 489,
+   "players": 231
+  },
+  "COVER_6": {
+   "r_half": -0.066,
+   "routes_per_half": 13.2,
+   "k": null,
+   "players": 152
+  },
+  "shares": {
+   "simple": [
+    0.407,
+    0.593
+   ],
+   "shell": [
+    0.576,
+    0.424
+   ],
+   "detailed": [
+    0.036,
+    0.307,
+    0.196,
+    0.064,
+    0.204,
+    0.096,
+    0.047,
+    0.051
+   ]
+  },
+  "teamRates": {
+   "simple": {
+    "mean": 0.402,
+    "sd": 0.111
+   },
+   "shell": {
+    "mean": 0.582,
+    "sd": 0.07
+   },
+   "corr": 0.54,
+   "teamSeasons": 96
+  },
+  "recommended_k": 690,
+  "seasons": "2023-2025"
+ }
+}
