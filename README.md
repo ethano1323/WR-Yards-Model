@@ -71,13 +71,36 @@ scripts/fit_split_reliability.py    (one-time fit; the workflow doesn't run it)
 .github/workflows/update-data.yml
 ```
 
+## Slate tab tools
+
+| Tool | Where | What it does |
+|---|---|---|
+| **Team filter** | "Teams to show" chips | Click any teams (e.g. GB, LA, KC, BUF) to show only their players, the defenses they face, and their games. "Show all teams" clears it. |
+| **Defense coverage rates** | Defense table | One row per defense facing your selected teams |
+| **Game context** | One panel per game | Total, spread, indoors, wind, rain/snow; per team: starting QB, projected pass attempts, pass catchers OUT, secondary OUT. Pre-filled from the injury report, expected starter and forecast. "Reset this game to automatic" undoes your edits. |
+| **Adjust** (per player) | Button on each row | Override season or last-4 yards/game, aDOT, projected target share, and the sportsbook used |
+| **Open** (per player) | Button on each row | Full single-player breakdown |
+
+**Shared context:** injuries, QB, total/spread, weather and pass attempts are stored per team or game for the week, so both views always agree. Marking a receiver out on the slate also shows him out when you open a teammate in Single player view, and the reverse.
+
+## Settings (top of page, apply to both views)
+
+| Setting | Plain meaning | Default |
+|---|---|---|
+| Full season vs. recent games | How much the last 4 games count vs. the whole season | 60% season / 40% recent |
+| Mix of the two projection methods | Routes-based vs. per-game-based (routes-based needs total routes) | 50 / 50 |
+| How much to trust coverage splits | Recommended = what 2023–25 data supports | Recommended |
+| If you enter splits but no route counts | How much the splits count when the model can't size them | 25% |
+| Warn me when fair line and book differ by more than | Triggers the ⚠ "check your inputs" warning | 20% |
+| Rain/snow penalty | Yards cut when "Heavy rain/snow" is checked | 5% |
+
 ## Weekly workflow
 
-1. **Thursday onward:** check the top bar on the site for the current week and the props timestamp.
+1. **Thursday onward:** check the top bar on the site for the current week and the props timestamp. On the Slate tab, click the teams you care about.
 2. **Slate tab, enter coverage once per defense:** fill in man % and single-high % for each defense in "Defense coverage rates" (the other side of each pair auto-fills).
 3. **Enter each player's FTN data in his row:** overall YPRR, his Man/Zone/1-Hi/2-Hi YPRR, total routes, and routes vs. Man and vs. 1-Hi (the other routes auto-fill).
 4. **Sort by EV/$100.** Blue rows are +EV with complete FTN data. ⚠ marks an edge flagged as unusually large.
-5. **Open a player** to check his teammates, defenders, QB and weather in detail.
+5. **Check Game context** for each game: injuries (Out/Doubtful pre-checked; decide on Questionable), QB, weather. Use **Adjust** for player-level tweaks.
 6. **Save the bets:** click **Save +EV bets to log** on the slate, or **Save to log** on a single player.
 7. **After the games:** enter actual yards in the log.
 

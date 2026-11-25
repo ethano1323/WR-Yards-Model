@@ -84,6 +84,20 @@
   .grp{border-left:2px solid var(--border)}
   .inline{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
   .inline > div{min-width:150px}
+  .shared{max-width:1250px;margin:12px auto 0;padding:0 16px}
+  .settings > div{border:1px solid var(--border);border-radius:8px;padding:10px}
+  .gchip{display:inline-flex;gap:3px;align-items:center;margin:0 8px 6px 0;padding:3px;border:1px solid var(--border);border-radius:8px}
+  .ctxGame{border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:10px}
+  .ctxGame summary{cursor:pointer;font-size:.88rem}
+  .ctxCols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .ctxTeam{border-top:1px solid var(--border);padding-top:8px}
+  .ctxH{font-weight:700;font-size:.85rem;margin-bottom:4px}
+  .ctxList{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 10px}
+  .ctxList label{font-weight:400;font-size:.8rem;display:flex;align-items:center;gap:2px;margin:0}
+  label.lbl{margin-top:8px}
+  .ctxTeam select,.ctxTeam input[type=number]{max-width:320px}
+  tr.adj td{background:var(--bg)}
+  tr.adj input{width:80px !important}
 </style>
 </head>
 <body>
@@ -95,6 +109,40 @@
 <div class="tabs">
   <button type="button" id="tabSingle" class="active">Single player</button>
   <button type="button" id="tabSlate">Slate</button>
+</div>
+
+<div class="shared">
+  <details class="card" id="settingsCard">
+    <summary>Settings (apply to both views)</summary>
+    <div class="grid settings" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <div><label for="seasonW">Full season vs. recent games</label>
+        <input id="seasonW" type="range" min="0" max="100" step="5" value="60">
+        <div class="sub"><b><span id="seasonWVal">60</span>%</b> full season · <b><span id="recentWVal">40</span>%</b> last 4 games</div>
+        <span class="hint">Slide toward "last 4 games" when a player's role has clearly changed (new starter, teammate traded or hurt). Slide toward "full season" for steadier numbers.</span></div>
+      <div><label for="rw">Mix of the two projection methods</label>
+        <input id="rw" type="range" min="0" max="100" step="5" value="50">
+        <div class="sub"><b><span id="rwVal">50</span>%</b> routes-based · <b><span id="rwVal2">50</span>%</b> per-game-based</div>
+        <span class="hint">The routes-based method only runs when you enter a player's total routes. 50/50 is a sensible default.</span></div>
+      <div><label for="kMult">How much to trust coverage splits (man/zone, etc.)</label>
+        <select id="kMult">
+          <option value="2">Trust them less</option>
+          <option value="1" selected>Recommended (what the data supports)</option>
+          <option value="0.5">Trust them more</option>
+          <option value="0.25">Trust them a lot more</option>
+        </select>
+        <span class="hint">A player's splits are mostly noise until he has run hundreds of routes against that coverage. "Recommended" uses what 2023–25 data showed.</span></div>
+      <div><label for="wLegacy">If you enter splits but no route counts at all, count the splits at:</label>
+        <input id="wLegacy" type="range" min="0" max="100" step="5" value="25">
+        <div class="sub"><b><span id="wLegacyVal">25</span>%</b></div>
+        <span class="hint">Better: enter routes (or at least total routes) and the model sets this for you.</span></div>
+      <div><label for="edgeThresh">Warn me when the fair line and the book's line differ by more than (%):</label>
+        <input id="edgeThresh" type="number" step="1" min="1" value="20">
+        <span class="hint">A gap this big usually means a typo or news the sportsbook already knows.</span></div>
+      <div><label for="precipPct">Rain/snow penalty (% fewer yards):</label>
+        <input id="precipPct" type="number" step="1" min="0" max="50" value="5">
+        <span class="hint">Only applies when "Heavy rain/snow" is checked. This is a starting guess. Adjust it after you've logged some bad-weather games.</span></div>
+    </div>
+  </details>
 </div>
 
 <!-- =================================== SINGLE PLAYER =================================== -->
@@ -153,10 +201,7 @@
       <div><label for="adot">aDOT (air yards / target)<span class="auto">auto</span></label><input id="adot" type="number" step="0.1" min="0">
         <span class="hint">Sets the outcome spread used for P(Over): deep threats are more volatile.</span></div>
     </div>
-    <div style="margin-top:10px">
-      <label for="seasonW">Season vs. last-4 weight: <span id="seasonWVal">60</span>% season / <span id="recentWVal">40</span>% recent</label>
-      <input id="seasonW" type="range" min="0" max="100" step="5" value="60">
-    </div>
+    <span class="hint" style="margin-top:6px">How much weight recent games get is set in Settings (top of page).</span>
     <div id="mateBox" class="hidden" style="margin-top:12px">
       <label>Teammates: check anyone who is OUT. Their targets are redistributed proportionally.</label>
       <span class="hint" style="margin-bottom:6px">Players listed Out or Doubtful are pre-checked. Proportional redistribution can overstate an alpha's gain when a big share is vacated, so trim it if it looks too high.</span>
@@ -229,20 +274,6 @@
     <div class="info" id="oddsInfo"></div>
   </section>
 
-  <details class="card" id="settingsCard">
-    <summary>Settings (apply to Single player and Slate)</summary>
-    <div class="grid">
-      <div><label for="rw">Route-method weight: <span id="rwVal">50</span>%</label><input id="rw" type="range" min="0" max="100" step="5" value="50">
-        <span class="hint">Final mean = YPG method × (1 − w) + route method × w. Used only when total routes is entered.</span></div>
-      <div><label for="kMult">Split shrinkage strength (× fitted)</label><input id="kMult" type="number" step="0.1" min="0.1" value="1">
-        <span class="hint">1.0 = the 2023–25 fit. Below 1 trusts splits more, above 1 trusts them less.</span></div>
-      <div><label for="wLegacy">Fallback coverage weight: <span id="wLegacyVal">25</span>%</label><input id="wLegacy" type="range" min="0" max="100" step="5" value="25">
-        <span class="hint">Used only when no route counts are entered at all.</span></div>
-      <div><label for="edgeThresh">Flag edges larger than (%)</label><input id="edgeThresh" type="number" step="1" min="1" value="20"></div>
-      <div><label for="precipF">Heavy rain/snow factor</label><input id="precipF" type="number" step="0.01" min="0.5" max="1" value="0.95">
-        <span class="hint">An assumption, not fitted (free data has no precipitation history).</span></div>
-    </div>
-  </details>
 </div>
 
 <div class="col">
@@ -284,6 +315,11 @@ Mean         = blend of the two · Fair line = Mean × historical median ratio</
       <div><label for="slSearch">Search</label><input id="slSearch" type="text" placeholder="name or team"></div>
       <div><label>Coverage view</label><div class="sub" id="slMode"></div></div>
     </div>
+    <div style="margin-top:12px">
+      <label>Teams to show <span class="sub" id="slTeamLbl"></span></label>
+      <div id="slTeams"></div>
+      <button type="button" class="small" id="slAll">Show all teams</button>
+    </div>
     <div class="info" id="slInfo"></div>
     <div class="row-actions">
       <button type="button" class="primary" id="slSave">Save +EV bets to log</button>
@@ -297,10 +333,17 @@ Mean         = blend of the two · Fair line = Mean × historical median ratio</
     <div class="scroll"><table id="defTable"></table></div>
   </details>
 
+  <details class="card full" id="ctxCard" open>
+    <summary>Game context: injuries, quarterbacks, weather &amp; pass volume</summary>
+    <span class="hint">Filled in automatically: players listed Out or Doubtful are checked, the expected QB is selected, and weather comes from the kickoff forecast.
+      Anything you change here also applies in Single player view, and vice versa. Games are shown for the teams you picked above.</span>
+    <div id="ctxBody"></div>
+  </details>
+
   <section class="card full">
     <div class="scroll"><table id="slateTable"></table></div>
     <span class="hint">Blue rows have a positive-EV side and complete FTN data. Rows marked "No FTN" use a neutral coverage factor and no route method; enter their FTN data to rely on them.
-      Defaults: teammates and defenders listed Out/Doubtful are treated as out, the expected QB starter is used, and weather is the kickoff forecast. Open a row to fine-tune.</span>
+      Click <b>Adjust</b> on a row to override that player's yards/game, aDOT, target share or sportsbook. Click <b>Open</b> for the full single-player breakdown.</span>
   </section>
 </main>
 
@@ -354,11 +397,11 @@ const STADIUMS = {
 };
 const FIELDS = ['player','team','opp','week','yprrAll','routesTotal','teamDb','ypg','l4ypg','seasonTS','l4TS','adot','projTS',
   'attAvg','dbPg','teamG','total','spread','projAtt','oppYPA','lgYPA','oppG','incYA','qbYA','wind','line','overOdds','underOdds',
-  'myBook','seasonW','rw','kMult','wLegacy','edgeThresh','precipF'];
+  'myBook','seasonW','rw','kMult','wLegacy','edgeThresh','precipPct'];
 const CHECKS = ['indoor','precip'];
-const DEFAULTS = { seasonW:60, rw:50, kMult:1, wLegacy:25, edgeThresh:20, precipF:0.95 };
+const DEFAULTS = { seasonW:60, rw:50, kMult:1, wLegacy:25, edgeThresh:20, precipPct:5 };
 const K = { inputs:'wrModel.inputs.v3', oldInputs:'wrModel.inputs.v2', log:'wrModel.log.v2', oldLog:'wrModel.log.v1',
-  mem:'wrModel.covmem.v1', book:'wrModel.book', lineMode:'wrModel.lineMode', slate:'wrModel.slate.v1' };
+  mem:'wrModel.covmem.v1', book:'wrModel.book', lineMode:'wrModel.lineMode', slate:'wrModel.slate.v1', slTeams:'wrModel.slTeams' };
 
 const $ = id => document.getElementById(id);
 const num = id => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
@@ -384,7 +427,7 @@ const wxCache = {};
 // ====================================================================================
 const setting = id => num(id) ?? DEFAULTS[id];
 function settings(){ return { ws: setting('seasonW')/100, rw: setting('rw')/100, kMult: setting('kMult'), wLegacy: setting('wLegacy')/100,
-  edgeThresh: setting('edgeThresh')/100, precipF: setting('precipF') }; }
+  edgeThresh: setting('edgeThresh')/100, precipF: 1 - setting('precipPct')/100 }; }
 function kList(m, mult){
   const ss = FITS && FITS.splitShrink, fb = { man:608, zone:773, single:2044, two:2552 };
   return SHRINK_KEYS[m].map(key => ((key && ss && ss[key] && ss[key].k) || (key && fb[key]) || NOSIG_K) * mult);
@@ -400,7 +443,7 @@ function weatherFactor(w, s){
   const fw = FITS && FITS.wind; let f = 1, note = 'not used';
   if (w.indoor){ f = fw && fw.indoor ? fw.indoor.factor : 1; note = 'indoors'; }
   else if (w.wind != null && fw){ const b = fw.buckets.find(x => w.wind >= x.lo && w.wind < x.hi) || fw.buckets[fw.buckets.length-1]; f = b.factor; note = `${w.wind} mph (${b.label})`; }
-  if (w.precip){ f *= s.precipF; note += ` + precip ×${s.precipF}`; }
+  if (w.precip){ f *= s.precipF; note += ` + rain/snow ×${f2(s.precipF)}`; }
   return { f, note };
 }
 function distFor(mean, adot){
@@ -555,6 +598,41 @@ function getInfo(name){
 }
 
 // ====================================================================================
+// Shared game context (used by BOTH views): injuries, QB, pass volume, lines, weather, player overrides
+// ====================================================================================
+const wkKey = () => DATA ? String(DATA.meta.week) : '';
+function patchKey(k, patch){
+  const o = Object.assign({}, mem()[k] || {}, patch);
+  Object.keys(o).forEach(x => { if (o[x] === null || o[x] === undefined) delete o[x]; });
+  memSet(k, Object.keys(o).length ? o : null);
+}
+const ctxGet  = team => mem()[`ctx|${wkKey()}|${team}`] || {};
+const ctxSet  = (team, patch) => patchKey(`ctx|${wkKey()}|${team}`, patch);
+const gctxGet = gid => mem()[`gctx|${wkKey()}|${gid}`] || {};
+const gctxSet = (gid, patch) => patchKey(`gctx|${wkKey()}|${gid}`, patch);
+const povrGet = name => mem()[`povr|${wkKey()}|${normName(name)}`] || {};
+const povrSet = (name, patch) => patchKey(`povr|${wkKey()}|${normName(name)}`, patch);
+function teamOut(team, exclude){ const c = ctxGet(team); return c.out ? new Set(c.out.filter(id => id !== exclude)) : defaultOut(DATA.teams[team] || {}, exclude); }
+function secondaryOut(team){ const c = ctxGet(team); return c.dbOut ? new Set(c.dbOut) : defaultDbOut(DATA.teams[team]); }
+function teamQB(team){
+  const t = DATA.teams[team] || {}, d = defaultQB(t); if (!d) return null;
+  const c = ctxGet(team), pick = c.qb && (t.qbs || []).find(q => q.id === c.qb);
+  return { inc: d.inc, starter: pick || d.starter, edited: !!pick };
+}
+function gameLines(g){ const o = gctxGet(g.id); return { total: o.total ?? g.total, spreadHome: o.spreadHome ?? g.spread, edited: o.total != null || o.spreadHome != null }; }
+function teamSpread(g, team){ const sh = gameLines(g).spreadHome; return sh == null ? null : (g.home === team ? sh : -sh); }
+function gameWx(g){
+  const o = gctxGet(g.id), v = venue(g) || {}, f = wxCache[g.id] || {};
+  return { indoor: o.indoor ?? !!v.indoor, wind: 'wind' in o ? o.wind : (f.wind ?? null), precip: o.precip ?? !!f.precip,
+           edited: ['indoor','wind','precip'].some(k => k in o) };
+}
+function teamProjAtt(team, g){
+  const c = ctxGet(team), t = DATA.teams[team] || {}, gl = g ? gameLines(g) : {};
+  const am = g ? attModel(t.attPg, gl.total, teamSpread(g, team), t.g) : null;
+  return { v: c.projAtt ?? (am ? am.v : null), auto: am ? am.v : null, edited: c.projAtt != null };
+}
+
+// ====================================================================================
 // SINGLE PLAYER VIEW
 // ====================================================================================
 function buildCoverageRows(data = {}){
@@ -644,25 +722,26 @@ function loadPlayer(id, fill = true){
   curId = id;
   const t = DATA.teams[p.team] || {}, g = gameFor(p.team);
   const home = g ? g.home === p.team : null, opp = g ? (home ? g.away : g.home) : '', ot = DATA.teams[opp];
+  const ov = povrGet(p.name);
   if (fill){
     set('player', p.name); set('team', p.team); set('week', DATA.meta.week); set('opp', opp);
-    set('ypg', p.ypg); set('l4ypg', p.l4ypg); set('seasonTS', p.ts); set('l4TS', p.l4ts); set('adot', p.adot); set('teamDb', p.teamDb);
+    set('ypg', ov.ypg ?? p.ypg); set('l4ypg', ov.l4ypg ?? p.l4ypg); set('seasonTS', p.ts); set('l4TS', p.l4ts); set('adot', ov.adot ?? p.adot); set('teamDb', p.teamDb);
     set('attAvg', t.attPg); set('dbPg', t.dbPg); set('teamG', t.g); set('lgYPA', DATA.league.ya);
     set('oppYPA', ot ? ot.oppYA : null); set('oppG', ot ? ot.g : null);
-    set('total', g ? g.total : null); set('spread', g && g.spread != null ? (home ? g.spread : -g.spread) : null);
-    out = defaultOut(t, id); dbOut = defaultDbOut(ot);
+    set('total', g ? gameLines(g).total : null); set('spread', g ? teamSpread(g, p.team) : null);
+    out = teamOut(p.team, id); dbOut = opp ? secondaryOut(opp) : new Set();
     recallDetail(true);
   }
   if (g){
     const st = p.status ? ` <span class="badge b-${esc(p.status)}">${esc(p.name)}: ${esc(p.status)}</span>` : '';
     const sp = num('spread');
     $('gameInfo').innerHTML = `<b>${esc(p.team)}</b> ${home ? 'vs' : '@'} <b>${esc(opp)}</b> · ${esc(g.gameday)} ${esc(g.gametime)} ET · ` +
-      `${sp == null ? 'spread n/a' : (sp > 0 ? 'favored by ' + sp : sp < 0 ? 'underdog by ' + (-sp) : "pick'em")} · total ${g.total ?? 'n/a'}${st}` +
+      `${sp == null ? 'spread n/a' : (sp > 0 ? 'favored by ' + sp : sp < 0 ? 'underdog by ' + (-sp) : "pick'em")} · total ${gameLines(g).total ?? 'n/a'}${st}` +
       `<br>Last games (wk, opp, tgt, yds): ${p.log.map(l => `W${l[0]} ${esc(l[1])} ${l[2]}/${l[3]}`).join(' · ')}`;
   } else $('gameInfo').innerHTML = '<span class="warn">No game found for this team this week.</span>';
-  renderMates(); if (fill) recomputeTS();
+  renderMates(); if (fill){ recomputeTS(); if (ov.projTS != null) set('projTS', ov.projTS); }
   renderDbs();
-  fillQBs(fill); if (fill) recomputeAtt();
+  fillQBs(fill); if (fill){ recomputeAtt(); const pa = teamProjAtt(p.team, g); if (pa.edited) set('projAtt', +(+pa.v).toFixed(1)); }
   fillBooks(fill ? 'player' : false);
   if (fill) setupWeather(g); else describeVenue(g);
 }
@@ -717,7 +796,7 @@ function fillQBs(fill){
   if (!t || !t.qbs || !t.qbs.length){ $('qbSelWrap').classList.add('hidden'); return; }
   $('qbSelWrap').classList.remove('hidden');
   $('qbSel').innerHTML = t.qbs.map(q => `<option value="${esc(q.id)}">${esc(q.name)}${q.incumbent ? ' (usual starter)' : ''} · ${f2(q.ya)} Y/A${q.status ? ' · ' + esc(q.status) : ''}</option>`).join('');
-  if (fill){ const d = defaultQB(t); $('qbSel').value = d.starter.id; set('incYA', d.inc.ya); set('qbYA', d.starter.ya); }
+  if (fill){ const d = teamQB(p.team); $('qbSel').value = d.starter.id; set('incYA', d.inc.ya); set('qbYA', d.starter.ya); }
   else { const saved = store.get(K.inputs); if (saved && saved.qb) $('qbSel').value = saved.qb; }
 }
 
@@ -748,6 +827,16 @@ async function forecast(g){
     precip: Math.max(...idx.map(i => j.hourly.precipitation[i])) >= 0.10 });
 }
 async function setupWeather(g){
+  await setupWeatherBase(g);
+  if (!g) return;
+  const o = gctxGet(g.id);
+  if ('indoor' in o) $('indoor').checked = o.indoor;
+  if ('wind' in o) set('wind', o.wind);
+  if ('precip' in o) $('precip').checked = o.precip;
+  if (['indoor','wind','precip'].some(k => k in o)) $('wxInfo').innerHTML += ' <b>Your weather edits for this game are applied.</b>';
+  calc(); saveInputs();
+}
+async function setupWeatherBase(g){
   const v = venue(g);
   if (!v){ $('wxInfo').textContent = 'No game found.'; calc(); return; }
   if (v.neutral){ describeVenue(g); $('indoor').checked = false; set('wind', null); $('precip').checked = false; calc(); return; }
@@ -770,9 +859,13 @@ async function setupWeather(g){
 
 // ---------- odds / own line ----------
 function booksFor(name){ return DATA && DATA.odds ? [...(DATA.odds[normName(name)] || [])].sort((a,b) => a.book.localeCompare(b.book)) : []; }
-function pickBook(books){ const pref = store.get(K.book); let i = books.findIndex(b => b.book === pref);
+function pickBook(books, name){
+  const ob = name ? povrGet(name).book : null;
+  let i = ob ? books.findIndex(b => b.book === ob) : -1;
+  if (i < 0){ const pref = store.get(K.book); i = books.findIndex(b => b.book === pref); }
   if (i < 0){ const ls = books.map(b => b.line).sort((a,b) => a-b), med = ls[Math.floor(ls.length/2)]; i = books.findIndex(b => b.line === med); }
-  return Math.max(0, i); }
+  return Math.max(0, i);
+}
 function setLineMode(m, fill){
   lineMode = m; store.set(K.lineMode, m);
   document.querySelectorAll('#lineToggle button').forEach(b => b.classList.toggle('active', b.dataset.line === m));
@@ -802,7 +895,7 @@ function fillBooks(fill){
   window.__books = books;
   const lines = books.map(b => b.line).sort((a,b) => a-b);
   $('oddsInfo').textContent = `${books.length} book(s) · lines ${lines[0]}–${lines[lines.length-1]}. Shop for the best number.`;
-  if (fill){ const i = pickBook(books); $('bookSel').value = i; applyBook(i); }
+  if (fill){ const i = pickBook(books, $('player').value); $('bookSel').value = i; applyBook(i); }
 }
 function applyBook(i){ const b = window.__books[i]; if (!b) return; set('line', b.line); set('overOdds', b.over); set('underOdds', b.under); store.set(K.book, b.book); }
 function rememberOwn(){
@@ -824,7 +917,7 @@ function gatherDetail(){
 function calc(){
   const s = settings();
   $('seasonWVal').textContent = Math.round(s.ws*100); $('recentWVal').textContent = Math.round(100 - s.ws*100);
-  $('rwVal').textContent = Math.round(s.rw*100); $('wLegacyVal').textContent = Math.round(s.wLegacy*100);
+  $('rwVal').textContent = Math.round(s.rw*100); $('rwVal2').textContent = Math.round(100 - s.rw*100); $('wLegacyVal').textContent = Math.round(s.wLegacy*100);
   const I = gatherDetail(), sumEl = $('covSum');
   sumEl.className = 'sumline';
   sumEl.innerHTML = I.dims.map(D => {
@@ -914,58 +1007,141 @@ function loadInputs(){
 // ====================================================================================
 // SLATE VIEW (#17)
 // ====================================================================================
-let slRows = [], slRes = {}, slSort = { key:'ev', dir:-1 };
+let slRows = [], slRes = {}, slSort = { key:'ev', dir:-1 }, slOpen = new Set();
+let slTeams = new Set(store.get(K.slTeams) || []);
 const inlineDims = () => mode === 'detailed' ? [] : MODES[mode];
+const oppOf = (g, team) => g ? (g.home === team ? g.away : g.home) : '';
+const badge = st => st ? `<span class="badge b-${esc(st)}">${esc(st)}</span>` : '';
 
 function slateInputs(pid){
-  const p = DATA.players[pid], t = DATA.teams[p.team] || {}, g = gameFor(p.team), wk = String(DATA.meta.week);
-  const home = g ? g.home === p.team : null, opp = g ? (home ? g.away : g.home) : '', ot = DATA.teams[opp];
-  const s = settings();
-  const info = getInfo(p.name) || {};
+  const p = DATA.players[pid], t = DATA.teams[p.team] || {}, g = gameFor(p.team), wk = wkKey();
+  const opp = oppOf(g, p.team), ot = DATA.teams[opp], s = settings(), ov = povrGet(p.name), info = getInfo(p.name) || {};
   const dims = MODES[mode].map(dim => {
     const n = COVERAGES[dim].length, rr = getRates(wk, opp, dim) || [], sp = getSplits(p.name, dim) || {};
     const arr = src => Array.from({length:n}, (_,i) => pnum((src || [])[i]));
     return { dim, rates: arr(rr), yprrs: arr(sp.y), routesBy: arr(sp.r) };
   });
-  const tsr = redistribute(p, t, defaultOut(t, pid), p.ts, p.l4ts, s.ws);
-  const am = g ? attModel(t.attPg, g.total, g.spread != null ? (home ? g.spread : -g.spread) : null, t.g) : null;
-  const qb = defaultQB(t);
-  const w = g ? (wxCache[g.id] || { indoor: (venue(g) || {}).indoor, wind: null, precip: false }) : { indoor:false, wind:null, precip:false };
+  const tsAuto = redistribute(p, t, teamOut(p.team, pid), p.ts, p.l4ts, s.ws).proj;
+  const pa = g ? teamProjAtt(p.team, g) : { v: null }, qb = teamQB(p.team);
+  const w = g ? gameWx(g) : { indoor:false, wind:null, precip:false };
   let line = null, over = null, under = null, book = '';
   if (lineMode === 'own'){ const o = mem()[ownKey(wk, p.name)]; if (o){ line = pnum(o.line); over = pnum(o.over); under = pnum(o.under); book = o.book || 'Own line'; } }
-  else { const bs = booksFor(p.name); if (bs.length){ const b = bs[pickBook(bs)]; line = b.line; over = b.over; under = b.under; book = b.book; } }
-  return { pid, p, opp, g, book, I: { strict:false, mode, set: s, ypg: p.ypg, l4ypg: p.l4ypg, seasonTS: p.ts, l4TS: p.l4ts, projTS: tsr.proj,
-    attAvg: t.attPg, projAtt: am ? am.v : null, dbPg: t.dbPg, oppYPA: ot ? ot.oppYA : null, lgYPA: DATA.league.ya, oppG: ot ? ot.g : null,
-    dbOut: dbCounts(ot, defaultDbOut(ot)), incYA: qb ? qb.inc.ya : null, qbYA: qb ? qb.starter.ya : null,
+  else { const bs = booksFor(p.name); if (bs.length){ const b = bs[pickBook(bs, p.name)]; line = b.line; over = b.over; under = b.under; book = b.book; } }
+  return { pid, p, opp, g, book, tsAuto, I: { strict:false, mode, set: s,
+    ypg: ov.ypg ?? p.ypg, l4ypg: ov.l4ypg ?? p.l4ypg, seasonTS: p.ts, l4TS: p.l4ts, projTS: ov.projTS ?? tsAuto,
+    attAvg: t.attPg, projAtt: pa.v, dbPg: t.dbPg, oppYPA: ot ? ot.oppYA : null, lgYPA: DATA.league.ya, oppG: ot ? ot.g : null,
+    dbOut: dbCounts(ot, opp ? secondaryOut(opp) : new Set()), incYA: qb ? qb.inc.ya : null, qbYA: qb ? qb.starter.ya : null,
     wx: { indoor: !!w.indoor, wind: w.wind, precip: !!w.precip }, dims,
-    yprrAll: pnum(info.all), routesTotal: pnum(info.routes), teamDb: p.teamDb, adot: p.adot,
+    yprrAll: pnum(info.all), routesTotal: pnum(info.routes), teamDb: p.teamDb, adot: ov.adot ?? p.adot,
     line, overOdds: over, underOdds: under } };
 }
 function slateList(){
   const minY = num('slMinYpg') ?? 0, q = $('slSearch').value.trim().toLowerCase(), lineOnly = $('slLineOnly').checked;
   return slatePlayers().map(([id]) => id).filter(id => {
     const p = DATA.players[id];
+    if (slTeams.size && !slTeams.has(p.team)) return false;
     if (p.ypg < minY) return false;
     if (q && !(`${p.name} ${p.team}`.toLowerCase().includes(q))) return false;
-    if (lineOnly){
-      if (lineMode === 'own'){ /* own mode: show everyone so lines can be typed */ }
-      else if (!booksFor(p.name).length) return false;
-    }
+    if (lineOnly && lineMode !== 'own' && !booksFor(p.name).length) return false;
     return true;
   });
 }
+const slateGames = () => (DATA.games || []).filter(g => !slTeams.size || slTeams.has(g.home) || slTeams.has(g.away));
+
+// ---------- team filter ----------
+function renderTeamChips(){
+  $('slTeams').innerHTML = (DATA.games || []).map(g => `<span class="gchip">${[g.away, g.home].map(tm =>
+    `<button type="button" class="small tchip${slTeams.has(tm) ? ' active' : ''}" data-team="${esc(tm)}">${esc(tm)}</button>`).join('<span class="muted">@</span>')}</span>`).join('');
+  $('slTeamLbl').textContent = slTeams.size ? `· showing ${[...slTeams].sort().join(', ')}` : '· showing all teams (click teams to narrow it down)';
+}
+
+// ---------- game context panels ----------
+function ctxHeader(g){
+  const gl = gameLines(g), sh = gl.spreadHome, v = venue(g) || {}, w = gameWx(g);
+  const fav = sh == null ? 'spread n/a' : sh > 0 ? `${g.home} −${sh}` : sh < 0 ? `${g.away} −${-sh}` : "pick'em";
+  const wx = w.indoor ? 'indoors' : v.neutral ? 'neutral site' : (w.wind != null ? `${w.wind} mph wind${w.precip ? ', rain/snow' : ''}` : 'forecast pending');
+  const edited = gl.edited || w.edited || Object.keys(ctxGet(g.home)).length || Object.keys(ctxGet(g.away)).length;
+  const outs = [g.away, g.home].map(tm => { const n = teamOut(tm, null).size; return n ? `${tm}: ${n} out` : ''; }).filter(Boolean).join(', ');
+  return `<b>${esc(g.away)} @ ${esc(g.home)}</b> · ${esc(g.gameday)} ${esc(g.gametime)} ET · ${esc(fav)} · total ${gl.total ?? 'n/a'} · ${esc(wx)}` +
+    (outs ? ` · <span class="bad">${esc(outs)}</span>` : '') + (edited ? ' · <span class="warn">edited</span>' : '');
+}
+function ctxTeamHTML(g, team){
+  const t = DATA.teams[team] || {}, outS = teamOut(team, null), dbS = secondaryOut(team), tq = teamQB(team), pa = teamProjAtt(team, g), ws = settings().ws;
+  const qb = tq ? `<select class="cx-qb" data-team="${esc(team)}">${(t.qbs || []).map(q => `<option value="${esc(q.id)}"${q.id === tq.starter.id ? ' selected' : ''}>${esc(q.name)}${q.incumbent ? ' (usual starter)' : ''} · ${f2(q.ya)} Y/A${q.status ? ' · ' + esc(q.status) : ''}</option>`).join('')}</select>` : '<span class="sub">n/a</span>';
+  const mates = (t.catchers || []).map(c => `<label><input type="checkbox" class="cx-out" data-team="${esc(team)}" data-id="${esc(c.id)}"${outS.has(c.id) ? ' checked' : ''}>${esc(c.name)}&nbsp;<span class="muted">${esc(c.pos)} ${f1(blendTS(c.ts, c.l4ts, ws))}%</span>${badge(c.status)}</label>`).join('') || '<span class="sub">n/a</span>';
+  const dbs = (t.dbs || []).map(d => `<label><input type="checkbox" class="cx-db" data-team="${esc(team)}" data-id="${esc(dbId(d))}"${dbS.has(dbId(d)) ? ' checked' : ''}>${esc(d.name)}&nbsp;<span class="muted">${esc(d.pos)} ${d.pct}% snaps</span>${badge(d.status)}</label>`).join('') || '<span class="sub">n/a</span>';
+  return `<div class="ctxTeam"><div class="ctxH">${esc(team)} offense</div>
+    <label class="lbl">Starting QB</label>${qb}
+    <label class="lbl">Projected pass attempts <span class="sub">(automatic: <span id="cxa-${esc(team)}">${pa.auto != null ? f1(pa.auto) : 'n/a'}</span>, type a number to override)</span></label>
+    <input class="cx-att" data-team="${esc(team)}" type="number" step="0.5" value="${pa.edited ? esc(+(+pa.v).toFixed(1)) : ''}" placeholder="${pa.auto != null ? f1(pa.auto) : ''}">
+    <label class="lbl">Pass catchers OUT <span class="sub">(their targets are shared out to teammates; % = target share)</span></label><div class="ctxList">${mates}</div>
+    <div class="ctxH" style="margin-top:10px">${esc(team)} secondary OUT <span class="sub" style="font-weight:400">(helps ${esc(oppOf(g, team))}'s receivers)</span></div><div class="ctxList">${dbs}</div></div>`;
+}
+function ctxGameHTML(g, open){
+  const o = gctxGet(g.id), w = gameWx(g), gid = esc(g.id);
+  return `<details class="ctxGame" data-game="${gid}"${open ? ' open' : ''}><summary id="cxh-${gid}">${ctxHeader(g)}</summary>
+    <div class="inline" style="margin:8px 0">
+      <div><label>Game total</label><input class="cx-total" data-game="${gid}" type="number" step="0.5" value="${esc(o.total ?? '')}" placeholder="${g.total ?? ''}"></div>
+      <div><label>${esc(g.home)} spread (+ = ${esc(g.home)} favored)</label><input class="cx-spread" data-game="${gid}" type="number" step="0.5" value="${esc(o.spreadHome ?? '')}" placeholder="${g.spread ?? ''}"></div>
+      <div><label><input type="checkbox" class="cx-indoor" data-game="${gid}"${w.indoor ? ' checked' : ''}>Indoors</label></div>
+      <div><label>Wind at kickoff (mph)</label><input class="cx-wind" data-game="${gid}" type="number" step="1" value="${esc('wind' in o ? o.wind : '')}" placeholder="${w.wind ?? ''}"></div>
+      <div><label><input type="checkbox" class="cx-precip" data-game="${gid}"${w.precip ? ' checked' : ''}>Heavy rain/snow</label></div>
+      <div><button type="button" class="small" data-reset-game="${gid}">Reset this game to automatic</button></div>
+    </div>
+    <div class="ctxCols">${ctxTeamHTML(g, g.away)}${ctxTeamHTML(g, g.home)}</div></details>`;
+}
+function renderCtx(){ const gs = slateGames(); $('ctxBody').innerHTML = gs.map(g => ctxGameHTML(g, gs.length <= 4)).join('') || '<div class="sub">No games this week.</div>'; }
+function refreshCtxGame(g){
+  const h = $('cxh-' + g.id); if (h) h.innerHTML = ctxHeader(g);
+  const w = gameWx(g), o = gctxGet(g.id);
+  const wi = document.querySelector(`.cx-wind[data-game="${g.id}"]`); if (wi) wi.placeholder = w.wind ?? '';
+  if (!('precip' in o)){ const pc = document.querySelector(`.cx-precip[data-game="${g.id}"]`); if (pc) pc.checked = !!w.precip; }
+  [g.home, g.away].forEach(tm => { const pa = teamProjAtt(tm, g), el = document.querySelector(`.cx-att[data-team="${tm}"]`), sp = $('cxa-' + tm);
+    if (el) el.placeholder = pa.auto != null ? f1(pa.auto) : ''; if (sp) sp.textContent = pa.auto != null ? f1(pa.auto) : 'n/a'; });
+}
+function ctxInput(t){
+  const gid = t.dataset.game, team = t.dataset.team, c = t.classList;
+  if (c.contains('cx-total')) gctxSet(gid, { total: pnum(t.value) });
+  else if (c.contains('cx-spread')) gctxSet(gid, { spreadHome: pnum(t.value) });
+  else if (c.contains('cx-wind')) gctxSet(gid, { wind: pnum(t.value) });
+  else if (c.contains('cx-indoor')) gctxSet(gid, { indoor: t.checked });
+  else if (c.contains('cx-precip')) gctxSet(gid, { precip: t.checked });
+  else if (c.contains('cx-qb')) ctxSet(team, { qb: t.value });
+  else if (c.contains('cx-att')) ctxSet(team, { projAtt: pnum(t.value) });
+  else if (c.contains('cx-out')) ctxSet(team, { out: [...document.querySelectorAll(`.cx-out[data-team="${team}"]:checked`)].map(e => e.dataset.id) });
+  else if (c.contains('cx-db')) ctxSet(team, { dbOut: [...document.querySelectorAll(`.cx-db[data-team="${team}"]:checked`)].map(e => e.dataset.id) });
+  else return false;
+  const g = gid ? DATA.games.find(x => x.id === gid) : gameFor(team);
+  if (g) refreshCtxGame(g);
+  slRows.forEach(computeRow); slateSummary();
+  return true;
+}
+
+// ---------- players table ----------
+function adjRowHTML(pid){
+  const p = DATA.players[pid], ov = povrGet(p.name), books = lineMode === 'own' ? [] : booksFor(p.name);
+  const cur = books.length ? books[pickBook(books, p.name)].book : '';
+  const inp = (f, label, ph, step) => `<div><label>${label}</label><input class="p-ovr" data-pid="${esc(pid)}" data-f="${f}" type="number" step="${step}" value="${esc(ov[f] ?? '')}" placeholder="${esc(ph ?? '')}"></div>`;
+  return `<tr class="adj${slOpen.has(pid) ? '' : ' hidden'}" id="adj-${esc(pid)}"><td colspan="40"><div class="inline">
+    ${inp('ypg', 'Season yards/game', p.ypg, 0.1)}${inp('l4ypg', 'Last-4 yards/game', p.l4ypg, 0.1)}${inp('adot', 'aDOT', p.adot, 0.1)}${inp('projTS', 'Projected target share %', '', 0.1)}
+    ${books.length ? `<div><label>Sportsbook</label><select class="p-book" data-pid="${esc(pid)}">${books.map(b => `<option value="${esc(b.book)}"${b.book === cur ? ' selected' : ''}>${esc(b.book)}: ${b.line} (${fmtOdds(b.over)}/${fmtOdds(b.under)})</option>`).join('')}</select></div>` : ''}
+    </div><span class="hint">Blank = automatic (grey number). Team-wide items (injuries, QB, weather, pass volume) are in Game context above.</span></td></tr>`;
+}
 function renderSlate(){
   if (!DATA) return;
+  renderTeamChips();
   $('slLineOnly').closest('div').classList.toggle('hidden', lineMode === 'own');
   $('slMode').textContent = MODE_LABEL[mode] + (mode === 'detailed' ? ' (splits: enter in Single player view)' : '');
-  // defenses panel: one column per coverage, grouped by dimension
-  const wk = String(DATA.meta.week), teams = [...teamsThisWeek()].sort(), dims = MODES[mode];
+  // defenses that face the selected teams
+  const wk = wkKey(), dims = MODES[mode];
+  const defTeams = (slTeams.size ? [...new Set([...slTeams].map(tm => oppOf(gameFor(tm), tm)).filter(Boolean))] : [...teamsThisWeek()]).sort();
   $('defTable').innerHTML = `<thead><tr><th>Defense</th>${dims.map(dim => COVERAGES[dim].map((l,i) => `<th class="num${i === 0 ? ' grp' : ''}">${esc(SHORT[dim][i])} %</th>`).join('') + `<th class="num">Total</th>`).join('')}</tr></thead><tbody>` +
-    teams.map(tm => `<tr><td><b>${esc(tm)}</b></td>` + dims.map(dim => { const r = getRates(wk, tm, dim) || [], tot = fillRates(COVERAGES[dim].map((_,i) => pnum(r[i]))).reduce((a,b) => a+b, 0);
+    defTeams.map(tm => `<tr><td><b>${esc(tm)}</b></td>` + dims.map(dim => { const r = getRates(wk, tm, dim) || [], tot = fillRates(COVERAGES[dim].map((_,i) => pnum(r[i]))).reduce((a,b) => a+b, 0);
       return COVERAGES[dim].map((_,i) => `<td class="num${i === 0 ? ' grp' : ''}"><input class="d-rate" data-team="${esc(tm)}" data-dim="${dim}" data-i="${i}" type="number" step="0.1" value="${esc(r[i] ?? '')}"></td>`).join('') +
         `<td class="num" id="dtot-${esc(tm)}-${dim}">${tot ? f1(tot) + '%' : '—'}</td>`; }).join('') + '</tr>').join('') + '</tbody>';
-  $('defCard').querySelector('summary').textContent = `Defense coverage rates (enter once per defense${dims.length > 1 || mode !== 'detailed' ? '; one side of each pair is enough' : ''})`;
-  // players table
+  $('defCard').querySelector('summary').textContent = `Defense coverage rates (${defTeams.length} defenses facing your selected teams; one side of each pair is enough)`;
+  renderCtx();
+  // players
   slRows = slateList();
   const idims = inlineDims(), own = lineMode === 'own';
   const ftnCols = `<th class="num grp">YPRR</th>` + idims.map(dim => SHORT[dim].map(l => `<th class="num">${esc(l)}</th>`).join('')).join('') +
@@ -973,29 +1149,32 @@ function renderSlate(){
   const lineCols = own ? `<th class="num grp">Line</th><th class="num">Over</th><th class="num">Under</th>` : `<th class="grp">Book</th><th class="num">Line</th><th class="num">Odds O/U</th>`;
   const sh = (k, l) => `<th class="num sort" data-k="${k}">${l}${slSort.key === k ? (slSort.dir < 0 ? ' ▾' : ' ▴') : ''}</th>`;
   $('slateTable').innerHTML = `<thead><tr><th class="sort" data-k="name">Player</th><th>Opp</th>${ftnCols}${lineCols}
-    <th class="grp num sort" data-k="mean">Mean${slSort.key==='mean'?(slSort.dir<0?' ▾':' ▴'):''}</th>${sh('fair','Fair')}${sh('p','P(Over)')}<th>Side</th>${sh('ev','EV/$100')}<th>FTN</th><th></th></tr></thead><tbody>` +
+    <th class="grp num sort" data-k="mean">Mean${slSort.key === 'mean' ? (slSort.dir < 0 ? ' ▾' : ' ▴') : ''}</th>${sh('fair','Fair')}${sh('p','P(Over)')}<th>Side</th>${sh('ev','EV/$100')}<th>FTN</th><th></th></tr></thead><tbody>` +
     slRows.map(pid => {
-      const p = DATA.players[pid], info = getInfo(p.name) || {}, g = gameFor(p.team);
-      const opp = g ? (g.home === p.team ? g.away : g.home) : '';
+      const p = DATA.players[pid], info = getInfo(p.name) || {}, g = gameFor(p.team), opp = oppOf(g, p.team);
       const inp = (cls, v, step, extra = '') => `<input class="${cls}" data-pid="${esc(pid)}" ${extra} type="number" step="${step}" value="${esc(v ?? '')}">`;
       const splitCells = kind => idims.map(dim => { const sp = getSplits(p.name, dim) || {}, src = kind === 'y' ? sp.y : sp.r;
         return COVERAGES[dim].map((_,i) => `<td class="num">${inp('s-split', (src || [])[i], kind === 'y' ? 0.01 : 1, `data-dim="${dim}" data-i="${i}" data-kind="${kind}"`)}</td>`).join(''); }).join('');
       const ftn = `<td class="num grp">${inp('s-all', info.all, 0.01)}</td>${splitCells('y')}<td class="num">${inp('s-rt', info.routes, 1)}</td>${splitCells('r')}`;
       let lc;
-      if (own){ const o = mem()[ownKey(String(DATA.meta.week), p.name)] || {}; lc = `<td class="num grp">${inp('s-line', o.line, 0.5)}</td><td class="num">${inp('s-over', o.over, 1)}</td><td class="num">${inp('s-under', o.under, 1)}</td>`; }
+      if (own){ const o = mem()[ownKey(wkKey(), p.name)] || {}; lc = `<td class="num grp">${inp('s-line', o.line, 0.5)}</td><td class="num">${inp('s-over', o.over, 1)}</td><td class="num">${inp('s-under', o.under, 1)}</td>`; }
       else lc = `<td class="grp" id="sb-${esc(pid)}"></td><td class="num" id="sl-${esc(pid)}"></td><td class="num" id="so-${esc(pid)}"></td>`;
-      return `<tr id="sr-${esc(pid)}"><td><b>${esc(p.name)}</b> <span class="muted">${esc(p.pos)} ${esc(p.team)}</span>${p.status ? `<span class="badge b-${esc(p.status)}">${esc(p.status)}</span>` : ''}</td>
+      return `<tr class="main" id="sr-${esc(pid)}"><td><b>${esc(p.name)}</b> <span class="muted">${esc(p.pos)} ${esc(p.team)}</span>${badge(p.status)}</td>
         <td>${esc(opp)}</td>${ftn}${lc}
         <td class="num grp" id="o-mean-${esc(pid)}"></td><td class="num" id="o-fair-${esc(pid)}"></td><td class="num" id="o-p-${esc(pid)}"></td>
         <td id="o-side-${esc(pid)}"></td><td class="num" id="o-ev-${esc(pid)}"></td><td id="o-ftn-${esc(pid)}"></td>
-        <td><button type="button" class="small" data-open="${esc(pid)}">Open</button></td></tr>`;
+        <td><button type="button" class="small" data-adj="${esc(pid)}">Adjust</button> <button type="button" class="small" data-open="${esc(pid)}">Open</button></td></tr>` + adjRowHTML(pid);
     }).join('') + '</tbody>';
   slRows.forEach(computeRow);
+  slateSummary();
+}
+function slateSummary(){
   $('slInfo').textContent = `${slRows.length} players · ${slRows.filter(id => slRes[id] && slRes[id].hasFTN).length} with FTN data · ${slRows.filter(id => slRes[id] && slRes[id].side && slRes[id].hasFTN).length} +EV with FTN data`;
 }
 function computeRow(pid){
   const S = slateInputs(pid), r = model(S.I); slRes[pid] = r.errors.length ? null : Object.assign(r, { book: S.book, opp: S.opp, name: S.p.name });
   const c = (id, html) => { const el = $(id + '-' + pid); if (el) el.innerHTML = html; };
+  const tsEl = document.querySelector(`.p-ovr[data-pid="${pid}"][data-f="projTS"]`); if (tsEl) tsEl.placeholder = f1(S.tsAuto);
   if (lineMode !== 'own'){ c('sb', esc(S.book || '—')); c('sl', S.I.line ?? '—'); c('so', S.I.line != null ? `${fmtOdds(S.I.overOdds)} / ${fmtOdds(S.I.underOdds)}` : '—'); }
   const tr = $('sr-' + pid);
   if (!slRes[pid]){ ['o-mean','o-fair','o-p','o-side','o-ev'].forEach(k => c(k, '—')); c('o-ftn', S.I.line == null ? '<span class="muted">no line</span>' : '—'); if (tr) tr.classList.remove('pos'); return; }
@@ -1007,29 +1186,29 @@ function computeRow(pid){
   if (tr) tr.classList.toggle('pos', !!(x.side && x.hasFTN));
 }
 function sortSlate(){
-  const key = slSort.key, dir = slSort.dir;
+  const key = slSort.key, dir = slSort.dir, tb = $('slateTable').querySelector('tbody'); if (!tb) return;
   const val = id => { const x = slRes[id], p = DATA.players[id];
     if (key === 'name') return p.name; if (!x) return -Infinity;
     return { mean:x.mean, fair:x.fair ?? -Infinity, p:x.pOver ?? -Infinity, ev:x.bestEV ?? -Infinity }[key]; };
-  const tb = $('slateTable').querySelector('tbody');
-  [...tb.children].sort((a,b) => { const va = val(a.id.slice(3)), vb = val(b.id.slice(3));
-    return (typeof va === 'string' ? va.localeCompare(vb) : (va - vb)) * dir; }).forEach(tr => tb.appendChild(tr));
+  [...tb.querySelectorAll('tr.main')].sort((a,b) => { const va = val(a.id.slice(3)), vb = val(b.id.slice(3));
+    return (typeof va === 'string' ? va.localeCompare(vb) : (va - vb)) * dir; })
+    .forEach(tr => { tb.appendChild(tr); const a = $('adj-' + tr.id.slice(3)); if (a) tb.appendChild(a); });
   $('slateTable').querySelectorAll('th.sort').forEach(th => { th.textContent = th.textContent.replace(/ [▾▴]$/, '') + (th.dataset.k === key ? (dir < 0 ? ' ▾' : ' ▴') : ''); });
 }
 async function slateWeather(){
   const gs = (DATA.games || []).filter(g => { const v = venue(g); return v && !v.neutral && !v.indoor && !wxCache[g.id]; });
   await Promise.all(gs.map(g => forecast(g).catch(() => null)));
-  if (gs.length && !$('viewSlate').classList.contains('hidden')){ slRows.forEach(computeRow); sortSlate(); }
+  if (gs.length && !$('viewSlate').classList.contains('hidden')){ slateGames().forEach(refreshCtxGame); slRows.forEach(computeRow); sortSlate(); }
 }
 function slateInput(t){
   const pid = t.dataset.pid, p = pid && DATA.players[pid];
   if (t.classList.contains('d-rate')){
-    const tm = t.dataset.team, dim = t.dataset.dim, wk = String(DATA.meta.week);
+    const tm = t.dataset.team, dim = t.dataset.dim, wk = wkKey();
     const r = [...document.querySelectorAll(`.d-rate[data-team="${tm}"][data-dim="${dim}"]`)].map(e => e.value);
     memSet(covKey(wk, tm, dim), r.some(v => v !== '') ? r : null);
     const tot = fillRates(r.map(pnum)).reduce((a,b) => a+b, 0); $(`dtot-${tm}-${dim}`).textContent = tot ? f1(tot) + '%' : '—';
-    slRows.filter(id => { const g = gameFor(DATA.players[id].team); return g && (g.home === tm || g.away === tm) && DATA.players[id].team !== tm; }).forEach(computeRow);
-    return;
+    slRows.filter(id => oppOf(gameFor(DATA.players[id].team), DATA.players[id].team) === tm).forEach(computeRow);
+    slateSummary(); return;
   }
   if (!p) return;
   const val = cls => { const el = document.querySelector(`.${cls}[data-pid="${pid}"]`); return el ? el.value : ''; };
@@ -1040,17 +1219,18 @@ function slateInput(t){
     memSet(splKey(p.name, dim), { y, r });
   }
   if (/^s-(line|over|under)$/.test(t.className)){
-    const k = ownKey(String(DATA.meta.week), p.name), o = mem()[k] || {};
+    const k = ownKey(wkKey(), p.name), o = mem()[k] || {};
     memSet(k, { line: val('s-line'), over: val('s-over'), under: val('s-under'), book: o.book || '' });
   }
-  computeRow(pid);
+  if (t.classList.contains('p-ovr')) povrSet(p.name, { [t.dataset.f]: pnum(t.value) });
+  computeRow(pid); slateSummary();
 }
 function saveSlateBets(){
   const log = getLog(); let n = 0;
   slRows.forEach(pid => {
     const x = slRes[pid]; if (!x || !x.side || !x.hasFTN) return;
-    if (log.some(e => e.player === x.name && String(e.week) === String(DATA.meta.week) && e.line === x.line)) return;
-    log.unshift(logEntry(x, x.name, x.opp, String(DATA.meta.week), x.book)); n++;
+    if (log.some(e => e.player === x.name && String(e.week) === wkKey() && e.line === x.line)) return;
+    log.unshift(logEntry(x, x.name, x.opp, wkKey(), x.book)); n++;
   });
   setLog(log); $('slMsg').textContent = n ? `Saved ${n} bet(s) to the log.` : 'No new +EV bets with FTN data to save.';
 }
@@ -1119,20 +1299,42 @@ function exportLog(){
 // ====================================================================================
 // EVENTS
 // ====================================================================================
-const ATT_INPUTS = new Set(['attAvg','teamG','total','spread']), TS_INPUTS = new Set(['seasonTS','l4TS','seasonW']);
+const ATT_INPUTS = new Set(['attAvg','teamG','total','spread']), TS_INPUTS = new Set(['seasonTS','l4TS']);
 const OWN_INPUTS = new Set(['line','overOdds','underOdds','myBook']);
+const PLAYER_OVR = new Set(['ypg','l4ypg','adot','projTS']);
+const SETTINGS_INPUTS = new Set(['seasonW','rw','kMult','wLegacy','edgeThresh','precipPct']);
 const inSlate = el => !!el.closest('#viewSlate');
+const curPlayer = () => curId && DATA ? DATA.players[curId] : null;
+const curGame = () => { const p = curPlayer(); return p ? gameFor(p.team) : null; };
+const isToggle = t => t.type === 'checkbox' || t.tagName === 'SELECT';
+function settingsChanged(){
+  if (curPlayer()){ recomputeTS(); renderMates(); const ov = povrGet(curPlayer().name); if (ov.projTS != null) set('projTS', ov.projTS); }
+  calc(); saveInputs();
+  if (!$('viewSlate').classList.contains('hidden') && DATA){ slRows.forEach(computeRow); slateSummary(); }
+}
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.classList.contains('actIn')){
     const log = getLog(); log[+t.dataset.i].actual = t.value; store.set(K.log, log);
     clearTimeout(window.__logT); window.__logT = setTimeout(renderLog, 400); return;
   }
+  if (SETTINGS_INPUTS.has(t.id)){ settingsChanged(); return; }
+  if (isToggle(t)) return;                                   // checkboxes/selects are handled on "change"
   if (inSlate(t)){
     if (['slMinYpg','slSearch'].includes(t.id)){ clearTimeout(window.__slT); window.__slT = setTimeout(() => { renderSlate(); sortSlate(); }, 300); return; }
-    slateInput(t); return;
+    if (!ctxInput(t)) slateInput(t);
+    return;
   }
-  if (t.id === 'pick'){ const id = window.__pickMap && window.__pickMap[t.value]; if (id){ loadPlayer(id, true); t.value = ''; t.blur(); } }
+  if (t.id === 'pick'){ const id = window.__pickMap && window.__pickMap[t.value]; if (id){ loadPlayer(id, true); t.value = ''; t.blur(); } return; }
+  const p = curPlayer(), g = curGame();
+  if (p){                                                    // write edits to the shared context
+    if (t.id === 'total' && g) gctxSet(g.id, { total: num('total') });
+    if (t.id === 'spread' && g){ const v = num('spread'); gctxSet(g.id, { spreadHome: v == null ? null : (g.home === p.team ? v : -v) }); }
+    if (ATT_INPUTS.has(t.id)) ctxSet(p.team, { projAtt: null });
+    if (t.id === 'projAtt') ctxSet(p.team, { projAtt: num('projAtt') });
+    if (t.id === 'wind' && g) gctxSet(g.id, { wind: num('wind') });
+    if (PLAYER_OVR.has(t.id)) povrSet(p.name, { [t.id]: num(t.id) });
+  }
   if (ATT_INPUTS.has(t.id)) recomputeAtt();
   if (TS_INPUTS.has(t.id)){ recomputeTS(); renderMates(); }
   if (t.classList.contains('covRate') || t.classList.contains('covYprr') || t.classList.contains('covRoutes') || t.id === 'yprrAll' || t.id === 'routesTotal') rememberDetail();
@@ -1141,18 +1343,42 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'slLineOnly'){ renderSlate(); sortSlate(); return; }
-  if (t.classList.contains('mateOut')){ t.checked ? out.add(t.dataset.id) : out.delete(t.dataset.id); recomputeTS(); }
-  else if (t.classList.contains('dbOutCb')){ t.checked ? dbOut.add(t.dataset.id) : dbOut.delete(t.dataset.id); }
-  else if (t.id === 'qbSel'){ const p = DATA.players[curId], q = DATA.teams[p.team].qbs.find(x => x.id === t.value); if (q) set('qbYA', q.ya); }
-  else if (t.id === 'bookSel') applyBook(+t.value);
-  else if (t.id === 'indoor' || t.id === 'precip'){} else return;
+  if (SETTINGS_INPUTS.has(t.id)) return;                     // handled on "input"
+  if (inSlate(t)){
+    if (t.id === 'slLineOnly'){ renderSlate(); sortSlate(); return; }
+    if (t.classList.contains('p-book')){ const p = DATA.players[t.dataset.pid]; povrSet(p.name, { book: t.value }); computeRow(t.dataset.pid); return; }
+    if (isToggle(t)) ctxInput(t);
+    return;
+  }
+  const p = curPlayer(), g = curGame();
+  if (t.classList.contains('mateOut')){
+    t.checked ? out.add(t.dataset.id) : out.delete(t.dataset.id);
+    if (p){ const all = new Set(out); if (teamOut(p.team, null).has(curId)) all.add(curId); ctxSet(p.team, { out: [...all] }); povrSet(p.name, { projTS: null }); }
+    recomputeTS();
+  }
+  else if (t.classList.contains('dbOutCb')){
+    t.checked ? dbOut.add(t.dataset.id) : dbOut.delete(t.dataset.id);
+    const opp = $('opp').value.trim().toUpperCase(); if (DATA && DATA.teams[opp]) ctxSet(opp, { dbOut: [...dbOut] });
+  }
+  else if (t.id === 'qbSel'){ const q = DATA.teams[p.team].qbs.find(x => x.id === t.value); if (q) set('qbYA', q.ya); ctxSet(p.team, { qb: t.value }); }
+  else if (t.id === 'bookSel'){ applyBook(+t.value); if (p && window.__books[+t.value]) povrSet(p.name, { book: window.__books[+t.value].book }); }
+  else if (t.id === 'indoor' || t.id === 'precip'){ if (p && g) gctxSet(g.id, { [t.id]: t.checked }); }
+  else return;
   calc(); saveInputs();
 });
 document.addEventListener('click', e => {
   const t = e.target;
   if (t.dataset.del !== undefined){ const log = getLog(); log.splice(+t.dataset.del, 1); setLog(log); return; }
   if (t.dataset.open){ showTab('single'); loadPlayer(t.dataset.open, true); try { window.scrollTo(0, 0); } catch(_){} return; }
+  if (t.dataset.adj){ const pid = t.dataset.adj; slOpen.has(pid) ? slOpen.delete(pid) : slOpen.add(pid); const a = $('adj-' + pid); if (a) a.classList.toggle('hidden'); return; }
+  if (t.classList.contains('tchip')){ const tm = t.dataset.team; slTeams.has(tm) ? slTeams.delete(tm) : slTeams.add(tm); store.set(K.slTeams, [...slTeams]); renderSlate(); sortSlate(); return; }
+  if (t.id === 'slAll'){ slTeams = new Set(); store.set(K.slTeams, []); renderSlate(); sortSlate(); return; }
+  if (t.dataset.resetGame){
+    const g = DATA.games.find(x => x.id === t.dataset.resetGame); if (!g) return;
+    [`gctx|${wkKey()}|${g.id}`, `ctx|${wkKey()}|${g.home}`, `ctx|${wkKey()}|${g.away}`].forEach(k => memSet(k, null));
+    const el = document.querySelector(`details.ctxGame[data-game="${g.id}"]`); if (el) el.outerHTML = ctxGameHTML(g, true);
+    slRows.forEach(computeRow); slateSummary(); return;
+  }
   if (t.matches('#slateTable th.sort')){ const k = t.dataset.k; slSort = { key:k, dir: slSort.key === k ? -slSort.dir : (k === 'name' ? 1 : -1) }; sortSlate(); }
 });
 document.querySelectorAll('#modeToggle button').forEach(b => b.onclick = () => { if (mode === b.dataset.mode) return; mode = b.dataset.mode; recallDetail(false); calc(); saveInputs(); });
@@ -1161,6 +1387,7 @@ function showTab(which){
   $('viewSingle').classList.toggle('hidden', which !== 'single'); $('viewSlate').classList.toggle('hidden', which !== 'slate');
   $('tabSingle').classList.toggle('active', which === 'single'); $('tabSlate').classList.toggle('active', which === 'slate');
   if (which === 'slate'){ renderSlate(); sortSlate(); slateWeather(); }
+  else if (curId && DATA) loadPlayer(curId, true);            // pick up any changes made on the slate
 }
 $('tabSingle').onclick = () => showTab('single');
 $('tabSlate').onclick = () => showTab('slate');
