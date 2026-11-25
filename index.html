@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WR/TE Receiving Yards Projection Model</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --text:#1b1f24; --muted:#5f6b7a; --border:#dde2e8;
+    --accent:#1f6feb; --good:#1a7f37; --bad:#cf222e; --warn:#9a6700; --input:#ffffff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1216; --card:#171b21; --text:#e6e9ee; --muted:#9aa4b2; --border:#2a313b;
+           --accent:#4c8dff; --good:#3fb950; --bad:#f85149; --warn:#d29922; --input:#0f1216; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--text);line-height:1.45}
+  header{padding:20px 16px 4px;max-width:1100px;margin:0 auto}
+  header h1{margin:0;font-size:1.5rem}
+  header p{margin:4px 0 0;color:var(--muted);font-size:.9rem}
+  main{max-width:1100px;margin:0 auto;padding:12px 16px 40px;display:grid;gap:14px;
+       grid-template-columns:1fr}
+  @media (min-width:900px){ main{grid-template-columns:1.15fr .85fr} .full{grid-column:1/-1} }
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .card h2{margin:0 0 10px;font-size:1.05rem}
+  .card h2 .step{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--accent);
+       color:#fff;font-size:.8rem;text-align:center;line-height:22px;margin-right:6px}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  label{display:block;font-size:.82rem;font-weight:600;margin-bottom:3px}
+  input,select{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;
+       background:var(--input);color:var(--text);font-size:.95rem}
+  input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .hint{display:block;color:var(--muted);font-size:.74rem;margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:.9rem}
+  th,td{padding:6px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:middle}
+  th{font-size:.76rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .toggle{display:flex;gap:6px;margin-bottom:4px;flex-wrap:wrap}
+  .toggle button{flex:1;min-width:120px}
+  button{padding:7px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);
+       color:var(--text);cursor:pointer;font-size:.88rem}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  button:hover{filter:brightness(1.05)}
+  .sumline{font-size:.82rem;margin-top:6px}
+  .ok{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+  details.card summary{cursor:pointer;font-weight:700;font-size:1.05rem}
+  details.card[open] summary{margin-bottom:10px}
+  .output{position:sticky;top:12px;align-self:start}
+  .big{font-size:2.6rem;font-weight:800;margin:2px 0 0;font-variant-numeric:tabular-nums}
+  .sub{color:var(--muted);font-size:.85rem}
+  .errors{color:var(--bad);font-size:.85rem;margin:6px 0 0;padding-left:18px}
+  .edge{margin-top:10px;padding:10px;border-radius:8px;border:1px solid var(--border);font-size:.92rem}
+  .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .log-wrap{overflow-x:auto}
+  .log-wrap input{width:80px;padding:4px 6px}
+  .stats{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0;font-size:.88rem}
+  .stats b{font-variant-numeric:tabular-nums}
+  .range-row{display:flex;align-items:center;gap:10px}
+  .range-row input{flex:1}
+  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;color:var(--muted);
+       background:var(--bg);padding:8px;border-radius:6px;margin-top:10px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>Receiving Yards Projection Model</h1>
+  <p>WR / TE · coverage-adjusted · 100% user-input (no paid data)</p>
+</header>
+
+<main>
+  <!-- LEFT: INPUTS -->
+  <div style="display:grid;gap:14px">
+
+    <section class="card">
+      <h2><span class="step">1</span>Matchup</h2>
+      <div class="grid">
+        <div><label for="player">Player</label><input id="player" type="text" placeholder="e.g. Puka Nacua"></div>
+        <div><label for="opp">Opponent</label><input id="opp" type="text" placeholder="e.g. SEA"></div>
+        <div><label for="week">Week</label><input id="week" type="text" placeholder="e.g. 13"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">2</span>Defense coverage &amp; player YPRR</h2>
+      <div class="toggle">
+        <button type="button" data-mode="simple" class="active">Man / Zone</button>
+        <button type="button" data-mode="shell">Single-high / Two-high</button>
+        <button type="button" data-mode="detailed">Cover 0–6</button>
+      </div>
+      <span class="hint" style="margin-bottom:10px">Use one view per projection. Man/zone and single/two-high overlap (most man coverage is single-high), so combining them would double count.</span>
+      <table>
+        <thead><tr><th>Coverage</th><th class="num">Defense rate (%)</th><th class="num">Player YPRR vs.</th></tr></thead>
+        <tbody id="covBody"></tbody>
+      </table>
+      <div id="covSum" class="sumline"></div>
+      <div class="grid" style="margin-top:10px">
+        <div>
+          <label for="yprrAll">Player overall YPRR (season)</label>
+          <input id="yprrAll" type="number" step="0.01" min="0" placeholder="e.g. 2.10">
+          <span class="hint">Blank coverage rows fall back to this value.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2><span class="step">3</span>Baseline, target share &amp; line</h2>
+      <div class="grid">
+        <div>
+          <label for="ypg">Season receiving yards / game</label>
+          <input id="ypg" type="number" step="0.1" min="0" placeholder="e.g. 78.4">
+          <span class="hint">Use only games where his role was normal.</span>
+        </div>
+        <div>
+          <label for="seasonTS">Season target share (%)</label>
+          <input id="seasonTS" type="number" step="0.1" min="0" max="100" placeholder="e.g. 24.5">
+        </div>
+        <div>
+          <label for="projTS">Projected target share this game (%)</label>
+          <input id="projTS" type="number" step="0.1" min="0" max="100" placeholder="e.g. 28.0">
+          <span class="hint">Raise it when a teammate is out, lower it when one returns.</span>
+        </div>
+        <div>
+          <label for="line">Sportsbook yardage line</label>
+          <input id="line" type="number" step="0.5" min="0" placeholder="e.g. 72.5">
+        </div>
+      </div>
+    </section>
+
+    <details class="card" id="optBox">
+      <summary>4. Optional adjustments (recommended)</summary>
+      <div class="grid">
+        <div>
+          <label for="attAvg">Team pass attempts / game (season)</label>
+          <input id="attAvg" type="number" step="0.1" min="0" placeholder="e.g. 34.2">
+        </div>
+        <div>
+          <label for="attProj">Projected team pass attempts (this game)</label>
+          <input id="attProj" type="number" step="0.1" min="0" placeholder="e.g. 37">
+          <span class="hint">Push this up if they're underdogs or the total is high, down if they're big favorites.</span>
+        </div>
+        <div>
+          <label for="oppYPA">Opp. yards allowed / pass attempt</label>
+          <input id="oppYPA" type="number" step="0.1" min="0" placeholder="e.g. 7.1">
+        </div>
+        <div>
+          <label for="lgYPA">League avg yards / pass attempt</label>
+          <input id="lgYPA" type="number" step="0.1" min="0" placeholder="e.g. 6.6">
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label for="weight">Matchup confidence: <span id="weightVal">50</span>%</label>
+        <div class="range-row"><input id="weight" type="range" min="0" max="100" step="5" value="50"></div>
+        <span class="hint">How much of the coverage and defense edge to trust. Coverage splits are small samples, so 50% is a safe start. Use 30–40% before about week 6 and 60–70% once the player has 100+ routes against each coverage.</span>
+      </div>
+    </details>
+  </div>
+
+  <!-- RIGHT: OUTPUT -->
+  <section class="card output">
+    <h2>Projection</h2>
+    <div class="sub" id="outTitle">Enter inputs to generate a projection</div>
+    <div class="big" id="outYards">—</div>
+    <div class="sub">projected receiving yards</div>
+    <ul class="errors" id="outErrors"></ul>
+    <table style="margin-top:12px">
+      <thead><tr><th>Component</th><th class="num">Input</th><th class="num">Factor</th></tr></thead>
+      <tbody id="outBreak"></tbody>
+    </table>
+    <div id="outEdge"></div>
+    <div class="row-actions">
+      <button class="primary" type="button" id="saveBtn">Save to log</button>
+      <button type="button" id="resetBtn">Reset inputs</button>
+    </div>
+    <div class="formula">Projection = Season YPG
+  × (Proj TS ÷ Season TS)
+  × (Proj pass att ÷ Season pass att)
+  × [1 + w × (Matchup YPRR ÷ Overall YPRR − 1)]
+  × [1 + w × (Opp Y/A ÷ League Y/A − 1)]</div>
+  </section>
+
+  <!-- LOG -->
+  <section class="card full">
+    <h2>Projection log &amp; accuracy tracker</h2>
+    <div class="sub">Enter actual yards after each game to track the model's error over time. The log is saved in this browser only.</div>
+    <div class="stats" id="logStats"></div>
+    <div class="log-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Player</th><th>Opp</th><th>Wk</th><th class="num">Proj</th><th class="num">Line</th><th class="num">Actual</th><th class="num">Error</th><th></th></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+    <div class="row-actions">
+      <button type="button" id="exportBtn">Export CSV</button>
+      <button type="button" id="clearBtn">Clear log</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+  const COVERAGES = {
+    simple:   ['Man', 'Zone'],
+    shell:    ['Single-high (MOFC)', 'Two-high (MOFO)'],
+    detailed: ['Cover 0', 'Cover 1', 'Cover 2', '2-Man', 'Cover 3', 'Cover 4 (Quarters)', 'Cover 6', 'Other']
+  };
+  const FIELDS = ['player','opp','week','yprrAll','ypg','seasonTS','projTS','attAvg','attProj','oppYPA','lgYPA','line','weight'];
+  const INPUT_KEY = 'wrModel.inputs.v1', LOG_KEY = 'wrModel.log.v1';
+
+  const $ = id => document.getElementById(id);
+  const num = id => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; };
+  const f1 = v => v.toFixed(1), f2 = v => v.toFixed(2), f3 = v => v.toFixed(3);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const store = {
+    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+    set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  };
+
+  let mode = 'simple';
+  let lastResult = null;
+
+  // ---------- Coverage table ----------
+  function buildCoverageRows(rates = [], yprrs = []){
+    $('covBody').innerHTML = COVERAGES[mode].map((c,i) => `
+      <tr>
+        <td>${c}</td>
+        <td class="num"><input class="covRate" type="number" step="0.1" min="0" max="100" placeholder="%" value="${rates[i] ?? ''}"></td>
+        <td class="num"><input class="covYprr" type="number" step="0.01" min="0" placeholder="YPRR" value="${yprrs[i] ?? ''}"></td>
+      </tr>`).join('');
+    document.querySelectorAll('.toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  }
+  const readCov = () => ({
+    rates: [...document.querySelectorAll('.covRate')].map(e => e.value),
+    yprrs: [...document.querySelectorAll('.covYprr')].map(e => e.value)
+  });
+
+  // ---------- Core model ----------
+  function calc(){
+    const errs = [];
+    const ypg = num('ypg'), yprrAll = num('yprrAll');
+    const seasonTS = num('seasonTS'), projTS = num('projTS');
+    const attAvg = num('attAvg'), attProj = num('attProj');
+    const oppYPA = num('oppYPA'), lgYPA = num('lgYPA');
+    const w = (num('weight') ?? 50) / 100;
+    $('weightVal').textContent = Math.round(w*100);
+
+    if (ypg === null)                     errs.push('Season receiving yards / game is required.');
+    if (yprrAll === null || yprrAll <= 0) errs.push('Player overall YPRR is required.');
+    if (num('line') === null || num('line') <= 0) errs.push('Sportsbook yardage line is required.');
+
+    // Coverage rates are normalized to 100% because sources often leave a few % unclassified.
+    const cov = readCov();
+    const rates = cov.rates.map(v => Math.max(0, parseFloat(v) || 0));
+    const sum = rates.reduce((a,b) => a+b, 0);
+    const sumEl = $('covSum');
+    if (sum === 0){ sumEl.className='sumline bad'; sumEl.textContent='Enter the defense coverage rates.'; errs.push('Enter at least one defense coverage rate.'); }
+    else if (Math.abs(sum-100) <= 0.5){ sumEl.className='sumline ok'; sumEl.textContent=`Total: ${f1(sum)}% ✓`; }
+    else { sumEl.className='sumline warn'; sumEl.textContent=`Total: ${f1(sum)}%. Rates will be scaled to 100%.`; }
+
+    // Target share
+    let tsFactor = 1, tsNote = 'not used';
+    if (projTS !== null || seasonTS !== null){
+      if (projTS !== null && seasonTS !== null && seasonTS > 0){ tsFactor = projTS / seasonTS; tsNote = `${f1(projTS)}% ÷ ${f1(seasonTS)}%`; }
+      else errs.push('Enter both season and projected target share, or leave both blank.');
+    }
+
+    // Pass volume (optional)
+    let volFactor = 1, volNote = 'not used';
+    if (attAvg !== null && attProj !== null && attAvg > 0){ volFactor = attProj / attAvg; volNote = `${f1(attProj)} ÷ ${f1(attAvg)}`; }
+    else if (attAvg !== null || attProj !== null) volNote = 'needs both fields';
+
+    // Defense efficiency (optional, shrunk by w)
+    let defRaw = 1, defFactor = 1, defNote = 'not used';
+    if (oppYPA !== null && lgYPA !== null && lgYPA > 0){ defRaw = oppYPA / lgYPA; defFactor = 1 + w*(defRaw-1); defNote = `${f1(oppYPA)} ÷ ${f1(lgYPA)} (raw ×${f3(defRaw)})`; }
+    else if (oppYPA !== null || lgYPA !== null) defNote = 'needs both fields';
+
+    if (errs.length){ render(null, errs); return null; }
+
+    // Coverage-weighted YPRR
+    const yprrs = cov.yprrs.map(v => { const x = parseFloat(v); return Number.isFinite(x) ? x : yprrAll; });
+    const matchupYPRR = rates.reduce((acc, r, i) => acc + (r/sum) * yprrs[i], 0);
+    const covRaw = matchupYPRR / yprrAll;
+    const covFactor = 1 + w*(covRaw - 1);
+
+    const proj = ypg * tsFactor * volFactor * covFactor * defFactor;
+    const res = {
+      proj, ypg, tsFactor, tsNote, volFactor, volNote, covRaw, covFactor, matchupYPRR, yprrAll,
+      defFactor, defNote, w, line: num('line'),
+      player: $('player').value.trim(), opp: $('opp').value.trim(), week: $('week').value.trim()
+    };
+    render(res, []);
+    return res;
+  }
+
+  function render(r, errs){
+    lastResult = r;
+    $('outErrors').innerHTML = errs.map(e => `<li>${esc(e)}</li>`).join('');
+    if (!r){ $('outYards').textContent='—'; $('outBreak').innerHTML=''; $('outEdge').innerHTML='';
+             $('outTitle').textContent='Enter inputs to generate a projection'; return; }
+
+    const who = [r.player || 'Player', r.opp ? `vs ${r.opp}` : '', r.week ? `· Wk ${r.week}` : ''].join(' ').trim();
+    $('outTitle').textContent = who;
+    $('outYards').textContent = f1(r.proj);
+
+    const fx = v => `<span class="${v>1.0005?'ok':v<0.9995?'bad':''}">×${f3(v)}</span>`;
+    $('outBreak').innerHTML = `
+      <tr><td>Baseline (season YPG)</td><td class="num">${f1(r.ypg)}</td><td class="num">—</td></tr>
+      <tr><td>Target share</td><td class="num">${esc(r.tsNote)}</td><td class="num">${fx(r.tsFactor)}</td></tr>
+      <tr><td>Team pass volume</td><td class="num">${esc(r.volNote)}</td><td class="num">${fx(r.volFactor)}</td></tr>
+      <tr><td>Coverage matchup<br><span class="sub">raw ×${f3(r.covRaw)} at ${Math.round(r.w*100)}% weight</span></td>
+          <td class="num">${f2(r.matchupYPRR)} vs ${f2(r.yprrAll)} YPRR</td><td class="num">${fx(r.covFactor)}</td></tr>
+      <tr><td>Defense efficiency</td><td class="num">${esc(r.defNote)}</td><td class="num">${fx(r.defFactor)}</td></tr>
+      <tr><td><b>Projection</b></td><td></td><td class="num"><b>${f1(r.proj)} yds</b></td></tr>`;
+
+    {
+      const d = r.proj - r.line, pct = d / r.line * 100;
+      const side = d > 0 ? 'OVER' : d < 0 ? 'UNDER' : 'NO EDGE';
+      const cls = d > 0 ? 'ok' : d < 0 ? 'bad' : '';
+      $('outEdge').innerHTML = `<div class="edge">Line ${f1(r.line)} → model is <b class="${cls}">${d>=0?'+':''}${f1(d)} yds (${pct>=0?'+':''}${f1(pct)}%)</b>, leaning <b class="${cls}">${side}</b></div>`;
+    }
+  }
+
+  // ---------- Persistence of inputs ----------
+  function saveInputs(){
+    const s = { mode, cov: readCov(), fields: {} };
+    FIELDS.forEach(id => s.fields[id] = $(id).value);
+    store.set(INPUT_KEY, s);
+  }
+  function loadInputs(){
+    const s = store.get(INPUT_KEY);
+    if (s && COVERAGES[s.mode]) mode = s.mode;
+    buildCoverageRows(s?.cov?.rates, s?.cov?.yprrs);
+    if (s?.fields) FIELDS.forEach(id => { if (s.fields[id] != null) $(id).value = s.fields[id]; });
+    if (s?.fields && ['attAvg','attProj','oppYPA','lgYPA'].some(id => s.fields[id])) $('optBox').open = true;
+  }
+
+  // ---------- Log ----------
+  const getLog = () => store.get(LOG_KEY) || [];
+  const setLog = l => { store.set(LOG_KEY, l); renderLog(); };
+
+  function renderLog(){
+    const log = getLog();
+    $('logBody').innerHTML = log.length ? log.map((e,i) => {
+      const act = parseFloat(e.actual);
+      const err = Number.isFinite(act) ? act - e.proj : null;
+      return `<tr>
+        <td>${esc(e.date)}</td><td>${esc(e.player)}</td><td>${esc(e.opp)}</td><td>${esc(e.week)}</td>
+        <td class="num">${f1(e.proj)}</td><td class="num">${e.line!=null?f1(e.line):'—'}</td>
+        <td class="num"><input type="number" step="1" data-i="${i}" class="actIn" value="${esc(e.actual ?? '')}"></td>
+        <td class="num ${err==null?'':err>=0?'ok':'bad'}">${err==null?'—':(err>=0?'+':'')+f1(err)}</td>
+        <td><button type="button" data-del="${i}">✕</button></td></tr>`;
+    }).join('') : `<tr><td colspan="9" class="sub">No saved projections yet.</td></tr>`;
+
+    const done = log.filter(e => Number.isFinite(parseFloat(e.actual)));
+    if (!done.length){ $('logStats').innerHTML = `<span>Saved: <b>${log.length}</b></span><span class="sub">Enter actual yards to see accuracy stats.</span>`; return; }
+    const errs = done.map(e => parseFloat(e.actual) - e.proj);
+    const mae = errs.reduce((a,b)=>a+Math.abs(b),0) / errs.length;
+    const bias = errs.reduce((a,b)=>a+b,0) / errs.length;
+    const withLine = done.filter(e => e.line != null && e.proj !== e.line && parseFloat(e.actual) !== e.line);
+    const hits = withLine.filter(e => (e.proj > e.line) === (parseFloat(e.actual) > e.line)).length;
+    $('logStats').innerHTML = `
+      <span>Saved: <b>${log.length}</b></span><span>Graded: <b>${done.length}</b></span>
+      <span>Mean abs. error: <b>${f1(mae)} yds</b></span>
+      <span>Bias: <b class="${bias>=0?'ok':'bad'}">${bias>=0?'+':''}${f1(bias)} yds</b> <span class="sub">(+ = model too low)</span></span>
+      ${withLine.length ? `<span>Side vs line: <b>${hits}/${withLine.length} (${f1(hits/withLine.length*100)}%)</b></span>` : ''}`;
+  }
+
+  function exportCSV(){
+    const log = getLog(); if (!log.length) return;
+    const cols = ['date','player','opp','week','proj','line','actual','ypg','tsFactor','volFactor','covRaw','covFactor','defFactor','weight'];
+    const q = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+    const csv = [cols.join(',')].concat(log.map(e => cols.map(c => q(typeof e[c]==='number' ? +e[c].toFixed(4) : e[c])).join(','))).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = `receiving-yards-log-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // ---------- Events ----------
+  document.addEventListener('input', e => {
+    if (e.target.classList.contains('actIn')){
+      const log = getLog(); log[+e.target.dataset.i].actual = e.target.value;
+      store.set(LOG_KEY, log);
+      clearTimeout(window.__logT); window.__logT = setTimeout(renderLog, 400);
+      return;
+    }
+    calc(); saveInputs();
+  });
+  $('logBody').addEventListener('click', e => {
+    const i = e.target.dataset.del; if (i === undefined) return;
+    const log = getLog(); log.splice(+i,1); setLog(log);
+  });
+  document.querySelectorAll('.toggle button').forEach(b => b.onclick = () => {
+    if (mode === b.dataset.mode) return;
+    mode = b.dataset.mode; buildCoverageRows(); calc(); saveInputs();
+  });
+  $('saveBtn').onclick = () => {
+    const r = calc(); if (!r) return;
+    const log = getLog();
+    log.unshift({ date: new Date().toISOString().slice(0,10), player: r.player, opp: r.opp, week: r.week,
+      proj: r.proj, line: r.line, actual: '', ypg: r.ypg, tsFactor: r.tsFactor, volFactor: r.volFactor,
+      covRaw: r.covRaw, covFactor: r.covFactor, defFactor: r.defFactor, weight: r.w });
+    setLog(log);
+  };
+  $('resetBtn').onclick = () => {
+    FIELDS.forEach(id => $(id).value = id==='weight' ? 50 : '');
+    buildCoverageRows(); calc(); saveInputs();
+  };
+  $('exportBtn').onclick = exportCSV;
+  $('clearBtn').onclick = () => { if (confirm('Delete every saved projection?')) setLog([]); };
+
+  loadInputs(); calc(); renderLog();
+})();
+</script>
+</body>
+</html>
