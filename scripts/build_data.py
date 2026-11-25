@@ -327,6 +327,23 @@ def main():
     except Exception as e:  # injuries can lag early in the week
         log("injuries unavailable:", e)
 
+    # ---- roster status: IR/PUP/NFI/suspended ("RES") and released players never appear on the
+    #      weekly injury report, so take them from the roster and let them override the report.
+    ROSTER_OUT = {"RES": "IR", "CUT": "Released", "RLS": "Released", "RET": "Released", "EXE": "Released"}
+    try:
+        ra = nfl.load_rosters(season)
+        if "week" in ra.columns:
+            ra = ra.sort("week").group_by("gsis_id").agg(pl.all().last())
+        n_res = 0
+        for x in ra.iter_rows(named=True):
+            lab = ROSTER_OUT.get(x["status"])
+            if lab and x["gsis_id"]:
+                status[x["gsis_id"]] = lab
+                n_res += 1
+        log(f"roster: {n_res} players on IR/reserve or released")
+    except Exception as e:
+        log("roster status unavailable:", e)
+
     # ---- games played from snap counts (so 0-catch games count), dropbacks from play-by-play
     idmap = nfl.load_players().select(["gsis_id", "pfr_id"]).drop_nulls()
     snaps = nfl.load_snap_counts(season).filter(pl.col("game_type").is_in(["REG", "WC", "DIV", "CON", "SB"]))
@@ -355,6 +372,8 @@ def main():
                                                        pl.col("targets").fill_null(0).sum().alias("tot_tgt")]))
     meta = {m["player_id"]: m for m in meta.iter_rows(named=True)
             if m["position"] in ("WR", "TE") or m["tot_tgt"] > 0}
+    # weeks each team has played (to measure how much of a player's absence is already in teammates' stats)
+    team_weeks = {x["team"]: sorted(x["week"]) for x in ts.group_by("team").agg(pl.col("week")).iter_rows(named=True)}
     players = {}
     for (pid,), grp in pg.filter(pl.col("player_id").is_in(list(meta))).group_by(["player_id"]):
         grp = grp.sort("week")
@@ -367,13 +386,19 @@ def main():
             "ts": r(tg / ttg * 100 if ttg else 0, 1), "l4ts": r(l4tg / l4ttg * 100 if l4ttg else 0, 1),
             "tgtPg": r(tg / grp.height, 1), "adot": r(grp["receiving_air_yards"].sum() / tg, 1) if tg >= 5 else None,
             "teamDb": int(grp["team_db"].sum()), "status": status.get(pid),
+            "missed": 0, "missedL4": 0,
             "log": [[int(x["week"]), x["opp"], int(x["targets"]), int(x["receiving_yards"])]
                     for x in grp.tail(6).iter_rows(named=True)],
         }
+        tw = team_weeks.get(p["team"], [])
+        mine = set(grp.filter(pl.col("team") == p["team"])["week"].to_list())
+        p["missed"] = sum(1 for w in tw if w not in mine) if mine else 0
+        p["missedL4"] = sum(1 for w in tw[-4:] if w not in mine) if mine else 0
         players[pid] = p
         if tg > 0 and p["team"] in teams:
             teams[p["team"]]["catchers"].append(
-                {"id": pid, "name": p["name"], "pos": p["pos"], "ts": p["ts"], "l4ts": p["l4ts"], "status": p["status"]})
+                {"id": pid, "name": p["name"], "pos": p["pos"], "ts": p["ts"], "l4ts": p["l4ts"], "status": p["status"],
+                 "missed": p["missed"], "missedL4": p["missedL4"]})
     for t in teams.values():
         t["catchers"] = sorted(t.get("catchers", []), key=lambda c: -c["ts"])[:12]
     log(f"players: {len(players)}")
